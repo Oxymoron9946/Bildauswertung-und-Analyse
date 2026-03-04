@@ -140,13 +140,19 @@ parfor vIdx = 1:length(videoFiles)
         y_lines = locs_roi(1:2);
         y_top = min(y_lines) + lowerThirdStartY - 1;
         y_bottom = max(y_lines) + lowerThirdStartY - 1;
-        padding = 10; 
-        y0 = max(1, y_top - padding);
-        y1 = min(imgH_full, y_bottom + padding);
+    
+        % --- KORREKTUR DER KANTEN (Asymmetrisch) ---
+        y_top_corrected = y_top - 7;      % Obere Linie etwas nach oben
+        y_bottom_corrected = y_bottom + 0; % Untere Linie lassen wir hier unverändert
+
+        padding = 8; 
+        y0 = max(1, y_top_corrected - padding);
+        y1 = min(imgH_full, y_bottom_corrected + padding);
         x0 = 1; x1 = imgW_full;
     else
         continue; % Überspringen, wenn keine ROI gefunden
     end
+
 
     % --- Frame Loop ---
     totalFrames = v.NumFrames;
@@ -291,14 +297,26 @@ parfor vIdx = 1:length(videoFiles)
                 mid_x = (x_e + x_s)/2;
                 
                 dataIdx = dataIdx + 1;
-                res_frame(dataIdx)   = frameIdx;
-                res_time_s(dataIdx)  = (frameIdx-1)/fps;
-                res_posIdx(dataIdx)  = currentPosIdx;
-                res_len_px(dataIdx)  = len_px;
-                res_len_mm(dataIdx)  = len_mm; 
-                res_mid_x(dataIdx)   = mid_x;
-                
+    
+                % Abstand der Blasenmitte vom RECHTEN Bildrand in mm
+                distFromRight_mm = (imgW - mid_x) * px2mm;
+    
+                % HINWEIS: Da im Batch-Modus kein Dialogfeld aufpoppen darf,
+                % nehmen wir hier entweder 0 an, oder berechnen es aus der Kamera-Pos.
+                % Beispiel: kanalStart_mm = (posNum - 1) * 120; 
+                % Für den Moment definieren wir den rechten Rand des aktuellen Bildes als 0.
+                kanalStart_mm = 0; 
+                xKanal_mm = kanalStart_mm + distFromRight_mm;
+
+                res_frame(dataIdx) = frameIdx;
+                res_time_s(dataIdx) = (frameIdx-1)/fps;
+                res_posIdx(dataIdx) = currentPosIdx;
+                res_len_px(dataIdx) = len_px;
+                res_len_mm(dataIdx) = len_mm; 
+                res_mid_x(dataIdx) = xKanal_mm; % HIER speichern wir X in mm!
+
                 currentPosIdx = currentPosIdx + 1; 
+
             end
         end
     end
@@ -371,51 +389,97 @@ for i = 1:height(uniqueVideos)
         continue;
     end
     
-    % Statistik pro BubbleIndex (Position im Bild) berechnen
-    videoStats = grpstats(videoData, 'BubbleIndex', {'mean', 'std', 'numel'}, 'DataVars', 'Len_mm');
+     % --- Valid Zone & Binning für das aktuelle Video ---
+    binSize_mm = 3; 
+    videoData.res_bin_mm = floor(videoData.MidX / binSize_mm) * binSize_mm + (binSize_mm/2);
+
+    xMin = floor(min(videoData.MidX)/binSize_mm)*binSize_mm;
+    xMax = ceil(max(videoData.MidX)/binSize_mm)*binSize_mm;
+    edges = xMin:binSize_mm:xMax;
     
-    % Plot erstellen
+    [binCount,~,binIdx] = histcounts(videoData.MidX, edges);
+    binCenter = edges(1:end-1) + binSize_mm/2;
+    
+    % Validitäts-Check (70% Schwelle)
+    nBins = numel(binCount);
+    i0 = max(1, round(0.20*nBins));
+    i1 = min(nBins, round(0.80*nBins));
+    refCount = median(binCount(i0:i1));
+    isValid = binCount >= 0.90 * refCount; % 90% Threshold aus V3 übernommen
+    
+    d = diff([false isValid false]);
+    starts = find(d==1);
+    ends = find(d==-1)-1;
+    
+    if isempty(starts)
+        validStart_mm = NaN; validEnd_mm = NaN;
+        inZone = true(height(videoData), 1); % Fallback: Alles nehmen
+    else
+        [~,k] = max(ends-starts);
+        validBins = starts(k):ends(k);
+        validStart_mm = edges(validBins(1));
+        validEnd_mm = edges(validBins(end)+1);
+        inZone = (videoData.MidX >= validStart_mm) & (videoData.MidX <= validEnd_mm);
+    end
+    
+    % Nur Daten in der Valid Zone für die Statistik nutzen
+    validVideoData = videoData(inZone, :);
+    if isempty(validVideoData), continue; end
+    
+    videoStats = grpstats(validVideoData, 'res_bin_mm', {'mean', 'std', 'numel'}, 'DataVars', 'Len_mm');
+
+    % --- Plot erstellen ---
     hFig = figure('Name', sprintf('Video %d/%d', i, height(uniqueVideos)), 'Position', [100 100 900 600], 'Visible', 'off');
-    
-    % Fehlerbalken-Plot
-    errorbar(videoStats.BubbleIndex, videoStats.mean_Len_mm, videoStats.std_Len_mm, ...
+
+    % Fehlerbalken-Plot über mm-Kanalposition
+    errorbar(videoStats.res_bin_mm, videoStats.mean_Len_mm, videoStats.std_Len_mm, ...
         '-s', 'LineWidth', 2, 'MarkerSize', 10, 'MarkerFaceColor', 'c', ...
         'MarkerEdgeColor', 'b', 'Color', 'b', 'CapSize', 10);
-    
-    xlabel('Slug-Position im Bild (1 = Eintritt ganz rechts)', 'FontSize', 12, 'FontWeight', 'bold');
+
+    xlabel('Position im Kanal [mm]', 'FontSize', 12, 'FontWeight', 'bold');
     ylabel('Mittlere Blasenlänge [mm]', 'FontSize', 12, 'FontWeight', 'bold');
-    
+
     titleStr = sprintf('Blasenlängen-Statistik\nGas: %s m/s | Liq: %s m/s | Kameraposition: %d | %d fps | Aufnahme: %s', ...
         gas, liq, pos, fps_val, rec);
     title(titleStr, 'FontSize', 13, 'FontWeight', 'bold');
-    
+
     grid on;
-    xticks(videoStats.BubbleIndex);
     
+    % Rote und Magenta Linien für Valid Zone einzeichnen
+    firstMeas_mm = min(validVideoData.MidX);
+    if ~isnan(validStart_mm)
+        xline(validStart_mm, 'm--', 'LineWidth', 1.5);
+        xline(validEnd_mm, 'm--', 'LineWidth', 1.5);
+        xline(firstMeas_mm, 'r-', 'LineWidth', 2);
+        
+        yMax = max(videoStats.mean_Len_mm);
+        text(firstMeas_mm, yMax, sprintf(' Start: %.1f mm', firstMeas_mm), ...
+             'Color','r','VerticalAlignment','top', 'FontSize', 10, 'FontWeight', 'bold');
+    end
+
     % Info-Textbox
     totalBubbles = sum(videoStats.numel_Len_mm);
     overallMean = mean(videoStats.mean_Len_mm);
     overallStd = std(videoStats.mean_Len_mm);
-    
-    infoText = sprintf('Gesamt: %d Blasen\nØ Länge: %.3f mm\nStdAbw: %.3f mm', ...
-        totalBubbles, overallMean, overallStd);
-    
+
+    infoText = sprintf('Gesamt: %d Blasen\nØ Länge: %.3f mm\nStdAbw: %.3f mm\nGültige Zone: %.1f bis %.1f mm', ...
+        totalBubbles, overallMean, overallStd, validStart_mm, validEnd_mm);
+
     annotation('textbox', [0.15 0.75 0.2 0.15], 'String', infoText, ...
         'FontSize', 10, 'EdgeColor', 'k', 'BackgroundColor', 'w', 'FitBoxToText', 'on');
-    
-       % --- NEU: Zentralen Ordner für alle Plots erstellen ---
+
+    % Zentralen Ordner für alle Plots erstellen
     plotsDir = fullfile(baseDir, 'Auswertungs_Plots');
     if ~exist(plotsDir, 'dir')
-        mkdir(plotsDir); % Ordner erstellen, falls er nicht existiert
+        mkdir(plotsDir); 
     end
 
-    % Speichern des Plots DIREKT IM NEUEN PLOT-ORDNER
     plotName = sprintf('Einzelauswertung_Gas%s_Liq%s_Pos%d_%dfps_Rec%s.png', ...
         strrep(char(gas), ',', '-'), strrep(char(liq), ',', '-'), pos, fps_val, rec);
-        
+
     plotSavePath = fullfile(plotsDir, plotName);
     saveas(hFig, plotSavePath);
-    
+
     fprintf('Plot %d/%d zentral gespeichert: %s\n', i, height(uniqueVideos), plotName);
     close(hFig);
 
