@@ -114,12 +114,21 @@ parfor vIdx = 1:length(videoFiles)
 
     if length(locs_roi) >= 2
         y_lines = locs_roi(1:2);
-        y0 = max(1, min(y_lines) + lowerThirdStartY - 1 - 15);
-        y1 = min(imgH_full, max(y_lines) + lowerThirdStartY - 1 + 15);
+        y_top = min(y_lines) + lowerThirdStartY - 1;
+        y_bottom = max(y_lines) + lowerThirdStartY - 1;
+    
+        % --- KORREKTUR DER KANTEN (Asymmetrisch aus Längen-Skript) ---
+        y_top_corrected = y_top - 7; 
+        y_bottom_corrected = y_bottom + 0; 
+    
+        padding = 8; 
+        y0 = max(1, y_top_corrected - padding);
+        y1 = min(imgH_full, y_bottom_corrected + padding);
         x0 = 1; x1 = imgW_full;
     else
         continue;
     end
+
 
     %% --- TRACKING LOGIK FÜR GESCHWINDIGKEIT ---
     v.CurrentTime = 0;
@@ -187,12 +196,12 @@ parfor vIdx = 1:length(videoFiles)
             % Versuche, diese Blase mit einer aus dem vorherigen Frame zu matchen
             if ~isempty(prevCentroids)
                 % Strömungsrichtung: Blase wandert nach LINKS (X wird kleiner)
-                % Differenz: Alte Position (X) minus Aktuelle Position (X)
-                % Muss positiv sein, da alte Position weiter rechts (größer) war
                 x_diffs = prevCentroids(:, 2) - currX; 
-                
-                % Finde gültige Kandidaten (Blase hat sich nach links bewegt, aber nicht weiter als maxJumpDist)
-                validMatches = find(x_diffs >= 0 & x_diffs < maxJumpDist_px);
+            
+                % Finde gültige Kandidaten (Blase MUSS nach links wandern!)
+                % Toleranz: min. 0 Pixel, max. 50 Pixel Sprung pro Frame (bei 500fps ausreichend)
+                validMatches = find(x_diffs >= -2 & x_diffs < 50); % -2 erlaubt minimale "Zittern" durch Pixelerkennung
+
                 
                 if ~isempty(validMatches)
                     % Nimm den besten Match (kleinster Abstand)
@@ -239,11 +248,22 @@ parfor vIdx = 1:length(videoFiles)
             endX = bubbleTracker(b, 5);
             
             % Eine Blase muss mindestens 10 Frames verfolgt worden sein, um gültig zu sein
+                        % Eine Blase muss mindestens 10 Frames verfolgt worden sein, um gültig zu sein
             frameDiff = endFrame - startFrame;
             if frameDiff >= 10
-                dist_px = endX - startX;
+                % KORREKTUR: StartX ist weiter rechts (größer) als EndX (kleiner, weil links)
+                % Um eine positive Strecke zu erhalten: StartX - EndX
+                dist_px = startX - endX; 
+                
+                % Zusätzlicher Filter: Ignoriere Blasen, die sich kaum/garnicht bewegt haben 
+                % (verhindert ID-Tauscher oder Rand-Artefakte)
+                if dist_px < 10 
+                    continue; 
+                end
+
                 dist_mm = dist_px * px2mm;
                 time_s = frameDiff * dt_frame;
+
                 
                 v_mm_s = dist_mm / time_s;
                 v_m_s = v_mm_s / 1000;
