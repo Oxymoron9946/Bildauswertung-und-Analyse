@@ -3,11 +3,11 @@
 clc; close all; clear;
 
 %% ----------------- Parameter -----------------
-videoFile = '019002.avi';
-fps = 200;
+videoFile = 'Test\0150021.avi';
+fps = 100;
 
 % --- Visualisierung An/Aus ---
-showVisuals = true;             % Tracking-Visualisierung während der Berechnung anzeigen
+showVisuals = false;             % Tracking-Visualisierung während der Berechnung anzeigen
 showCalibrationImage = true;   % Das Bild der automatischen Kalibrierung zur Kontrolle anzeigen
 
 % --- Filter für Flüssigkeits-Slugs (Sanduhren) ---
@@ -102,8 +102,6 @@ if length(locs) >= 10
             plot(global_locs, repmat(bestY, size(global_locs)), 'r+', 'MarkerSize', 8, 'LineWidth', 1.5);
             plot([global_firstTick, global_lastTick], [bestY, bestY], 'go-', 'MarkerSize', 10, 'LineWidth', 2);
             title(sprintf('Suchband (gelb) | Messbereich (Grün): %.2f mm', calibDistance_mm));
-            pause(2); % Zeigt das Bild 2 Sekunden und schließt es dann
-            if isgraphics(hFigCalib), close(hFigCalib); end 
         end
     else
         warning('Kalibrierung fehlgeschlagen: Abstände unregelmäßig.');
@@ -111,6 +109,8 @@ if length(locs) >= 10
 else
     warning('Kalibrierung fehlgeschlagen: Zu wenige Striche gefunden.');
 end
+
+
 
 %% ----------------- Automatische ROI Erkennung -----------------
 lowerThirdStartY = floor(imgH * 2/3);
@@ -122,22 +122,61 @@ edgesH(1:borderIgnore, :) = 0; edgesH(end-borderIgnore+1:end, :) = 0;
 edgesH(:, 1:borderIgnore) = 0; edgesH(:, end-borderIgnore+1:end) = 0;
 
 rowSum = sum(edgesH, 2);
-[~, locs] = findpeaks(rowSum, 'MinPeakDistance', 20, 'SortStr', 'descend');
+[~, locs_roi] = findpeaks(rowSum, 'MinPeakDistance', 20, 'SortStr', 'descend');
 
-if length(locs) >= 2
-    y_lines = locs(1:2);
+if length(locs_roi) >= 2
+    y_lines = locs_roi(1:2);
     y_top = min(y_lines) + lowerThirdStartY - 1;
     y_bottom = max(y_lines) + lowerThirdStartY - 1;
     
-    padding = 10; 
-    y0 = max(1, y_top - padding);
-    y1 = min(imgH, y_bottom + padding);
+    y_top_corrected = y_top - 7;     % Verschiebt die obere Linie um 15 Pixel nach oben
+    y_bottom_corrected = y_bottom + 0; % Verschiebt die untere Linie leicht nach unten
+
+    padding = 8; 
+    y0 = max(1, y_top_corrected - padding);
+    y1 = min(imgH, y_bottom_corrected + padding);
     x0 = 1;
     x1 = imgW;
     fprintf('ROI erkannt: Y von %d bis %d\n\n', y0, y1);
+    
+    % --- NEU: Visualisierung der erkannten ROI Kanten ---
+    if showCalibrationImage
+        % Prüfen ob das Figure-Fenster aus der Kalibrierung noch offen ist
+        if ~exist('hFigCalib', 'var') || ~isgraphics(hFigCalib)
+            hFigCalib = figure('Name', 'Kalibrierung & ROI Kontrolle');
+            imshow(firstFrameGray, []); hold on;
+        else
+            figure(hFigCalib); % Fenster in den Vordergrund holen
+            hold on;
+        end
+        
+        % Die beiden erkannten Kanal-Kanten einzeichnen (z.B. in Cyan)
+        plot([1, imgW], [y_top, y_top], 'c-', 'LineWidth', 1.5);
+        plot([1, imgW], [y_bottom, y_bottom], 'c-', 'LineWidth', 1.5);
+        
+        % Die erweiterte ROI (inklusive Padding) einzeichnen (z.B. in Magenta gestrichelt)
+        plot([1, imgW], [y0, y0], 'm--', 'LineWidth', 1);
+        plot([1, imgW], [y1, y1], 'm--', 'LineWidth', 1);
+        
+        title(sprintf('Suchband (gelb) | Maßstab (Grün) | Kanal-Kanten (Cyan) | ROI (Magenta)'));
+        
+        % Etwas länger pausieren, damit man alles in Ruhe ansehen kann
+        pause(4); 
+        if isgraphics(hFigCalib), close(hFigCalib); end 
+    end
 else
     error('Konnte Kanal (ROI) nicht automatisch erkennen.');
 end
+%% --- Abfrage der realen Kanalposition ---
+% prompt = {'Bitte reale Kanalposition des rechten Bildrandes (Eintritt) in mm eingeben:'};
+% dlgtitle = 'Startposition des Kanals';
+% dims = [1 50];
+% definput = {'0'};
+% answer = inputdlg(prompt, dlgtitle, dims, definput);
+% if isempty(answer)
+%     return; % Skript abbrechen, falls "Cancel" geklickt wird
+% end
+kanalStart_mm = 0;
 
 %% ----------------- Frame Loop -----------------
 totalFrames = v.NumFrames;
@@ -322,12 +361,24 @@ while hasFrame(v)
             end
             
             dataIdx = dataIdx + 1;
+
+            % Abstand der Blasenmitte vom RECHTEN Bildrand in mm
+            distFromRight_mm = (imgW - mid_x) * px2mm;
+
+            % Reale Kanalposition der Blase = Startposition + Abstand vom rechten Rand
+            kanal_pos_mm = kanalStart_mm + distFromRight_mm;
+
             res_frame(dataIdx)   = frameIdx;
             res_time_s(dataIdx)  = (frameIdx-1)/fps;
             res_posIdx(dataIdx)  = currentPosIdx;
             res_len_px(dataIdx)  = len_px;
             res_len_mm(dataIdx)  = len_mm; 
             res_mid_x(dataIdx)   = mid_x;
+
+            distFromRight_mm = (imgW - mid_x) * px2mm;      % Abstand vom rechten Bildrand in mm
+            xKanal_mm = kanalStart_mm + distFromRight_mm;   % absolute Kanalposition
+
+            res_mid_x(dataIdx) = xKanal_mm;                 % ab jetzt: MidX = Kanalposition [mm]
             
             if showVisuals && mod(frameIdx, visualizeEveryNFrames) == 0
                 y_e = det(j).rightY; y_s = det(j+1).leftY;
@@ -384,14 +435,76 @@ if isempty(res_frame)
     warning('Keine Blasen-Daten vorhanden.'); return;
 end
 
-TBL = table(res_frame, res_time_s, res_posIdx, res_len_px, res_len_mm, res_mid_x, ...
-    'VariableNames', {'Frame','Time_s','Position','Len_px','Len_mm','MidX'});
-stats = grpstats(TBL, 'Position', {'mean', 'std', 'numel'}, 'DataVars', {'Len_px', 'Len_mm'});
-disp(stats(:, {'mean_Len_mm', 'std_Len_mm', 'numel_Len_mm'}));
+% --- Rasterung der Kanallänge (z.B. in 10 mm Schritten) ---
 
-figure('Name', 'Statistik');
-errorbar(stats.Position, stats.mean_Len_mm, stats.std_Len_mm, '-s', 'LineWidth', 1.5, 'MarkerSize', 8, 'MarkerFaceColor', 'c', 'Color', 'b');
-xlabel('Blasen-Position im Bild (1 = Eintritt ganz rechts)'); ylabel('Mittlere Blasenlänge [mm]');
-title('Mittlere Blasenlänge'); grid on; xticks(stats.Position);
 
-writetable(stats, 'Statistik_Ergebnisse.csv');
+
+TBL = table(res_frame, res_time_s, res_posIdx, res_len_mm, res_mid_x, ...
+    'VariableNames', {'Frame','Time_s','BubbleIndex','Len_mm','X_mm'});
+
+binSize_mm = 3;  % <- anpassen (bei dir evtl. 5–10 mm sinnvoll)
+
+% Runden der exakten Positionen auf das nächste Raster (z.B. 12.3 -> 10, 16.8 -> 15)
+res_bin_mm = floor(res_mid_x / binSize_mm) * binSize_mm + (binSize_mm/2);
+
+xMin = floor(min(TBL.X_mm)/binSize_mm)*binSize_mm;
+xMax = ceil(max(TBL.X_mm)/binSize_mm)*binSize_mm;
+edges = xMin:binSize_mm:xMax;
+
+[binCount,~,binIdx] = histcounts(TBL.X_mm, edges);
+binCenter = edges(1:end-1) + binSize_mm/2;
+
+% Referenz: "Mitte" = mittlere 60% der Bins (Ränder ausklammern)
+nBins = numel(binCount);
+i0 = max(1, round(0.20*nBins));
+i1 = min(nBins, round(0.80*nBins));
+refCount = median(binCount(i0:i1));
+
+frac = 0.90;  % <- Schwelle: 70% des Referenz-Counts
+isValid = binCount >= frac*refCount;
+
+% Längstes zusammenhängendes valid-Segment finden
+d = diff([false isValid false]);
+starts = find(d==1);
+ends   = find(d==-1)-1;
+if isempty(starts)
+    warning('Keine gültige Messzone gefunden (Zählstatistik zu ungleichmäßig).');
+    validStart_mm = NaN; validEnd_mm = NaN;
+else
+    [~,k] = max(ends-starts);
+    validBins = starts(k):ends(k);
+    validStart_mm = edges(validBins(1));
+    validEnd_mm   = edges(validBins(end)+1);
+end
+
+% Daten auf gültige Zone filtern
+inZone = (TBL.X_mm >= validStart_mm) & (TBL.X_mm <= validEnd_mm);
+TBLz = TBL(inZone,:);
+
+% Anzeige: Abstand des ersten Messpunkts der gültigen Zone zum Startwert
+firstMeas_mm = min(TBLz.X_mm);
+offsetStart_mm = firstMeas_mm - kanalStart_mm;
+
+fprintf('Gültige Messzone: %.1f ... %.1f mm\n', validStart_mm, validEnd_mm);
+fprintf('Erster gültiger Messpunkt bei %.1f mm (Offset zum Start: %.1f mm)\n', ...
+        firstMeas_mm, offsetStart_mm);
+
+% Statistik über Kanalposition (Bins) innerhalb der Zone
+TBLz.BinCenter_mm = binCenter(binIdx(inZone))';
+stats = grpstats(TBLz, 'BinCenter_mm', {'mean','std','numel'}, 'DataVars','Len_mm');
+writetable(stats, 'Statistik_Ergebnisse_Kanallaenge.csv');
+
+figure('Name','Blasenlänge über Kanallänge');
+errorbar(stats.BinCenter_mm, stats.mean_Len_mm, stats.std_Len_mm, '-s', ...
+    'LineWidth', 1.5, 'MarkerSize', 8, 'MarkerFaceColor','c', 'Color','b');
+grid on;
+xlabel('Position im Kanal [mm]');
+ylabel('Mittlere Blasenlänge [mm]');
+title('Blasenlänge über Kanallänge (gültige Zone automatisch)');
+
+xline(validStart_mm, 'm--', 'LineWidth', 1.5);
+xline(validEnd_mm,   'm--', 'LineWidth', 1.5);
+xline(firstMeas_mm,  'r-',  'LineWidth', 2);
+text(firstMeas_mm, max(stats.mean_Len_mm), ...
+     sprintf(' Start Messung: %.1f mm (Offset %.1f mm)', firstMeas_mm, offsetStart_mm), ...
+     'Color','r','VerticalAlignment','top');
