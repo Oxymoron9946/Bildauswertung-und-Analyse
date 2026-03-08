@@ -3,13 +3,15 @@ clc; close all; clear;
 
 %% ----------------- 1. Parameter -----------------
 % Trage hier den Pfad zu deinem 500fps Video ein
-videoFile = 'Test\test5002.avi';
-fps = 500; % ACHTUNG: Auf 500 setzen für Geschwindigkeitsvideos!
+videoFile = 'Test\test_9.avi';
+fps = 200; % ACHTUNG: Auf 500 setzen für Geschwindigkeitsvideos!
 
 % --- Visualisierung ---
-showVisuals = true; % Live-Tracking anzeigen
+showVisuals = false; % Live-Tracking anzeigen
 visualizeEveryNFrames = 1; % Nur jeden 10. Frame zeichnen (für Performance)
-showCalibrationImage = true; % Kontrollbild für Kalibrierung & ROI zeigen
+showCalibrationImage = false; % Kontrollbild für Kalibrierung & ROI zeigen
+% --- Kontroll-Bilder speichern ---
+saveCalibrationImages = true; % Speichert das erste Frame mit eingezeichneter ROI & Kalibrierung als Bild ab
 
 % --- Filter für Flüssigkeits-Slugs ---
 minPixel = 50;
@@ -52,6 +54,14 @@ smoothedProfile = smoothdata(invertedProfile, 'gaussian', 5);
 
 prominenceThreshold = max(smoothedProfile) * 0.10; 
 [pks, locs] = findpeaks(smoothedProfile, 'MinPeakDistance', 8, 'MinPeakProminence', prominenceThreshold);
+
+% Variablen für die visuelle Kontrolle vorbereiten
+calibSuccess = false;
+global_locs = [];
+global_firstTick = NaN;
+global_lastTick = NaN;
+calibDistance_mm = 0;
+
 if length(locs) >= 10
     peakDiffs = diff(locs); medianPx = median(peakDiffs);
     valid_mask = abs(peakDiffs - medianPx) < (0.25 * medianPx);
@@ -67,6 +77,13 @@ if length(locs) >= 10
         
         px2mm = calibDistance_mm / calibDistance_px;
         fprintf('Kalibrierung: %.5f mm/px\n', px2mm);
+        
+        calibSuccess = true;
+        
+        % Globale Koordinaten für das Zeichnen vorbereiten (inkl. Rand)
+        global_locs = locs(longestChainIdx) + x_margin - 1;
+        global_firstTick = firstTick_X_local + x_margin - 1;
+        global_lastTick = lastTick_X_local + x_margin - 1;
     end
 end
 
@@ -97,12 +114,25 @@ if length(locs_roi) >= 2
     if showCalibrationImage
         hFigCalib = figure('Name', 'Kalibrierung & ROI Kontrolle');
         imshow(firstFrameGray, []); hold on;
+        
+        % 1. Kanal-Kanten (Cyan) und ROI (Magenta) einzeichnen
         plot([1, imgW_full], [y_top, y_top], 'c-', 'LineWidth', 1.5);
         plot([1, imgW_full], [y_bottom, y_bottom], 'c-', 'LineWidth', 1.5);
         plot([1, imgW_full], [y0, y0], 'm--', 'LineWidth', 1);
         plot([1, imgW_full], [y1, y1], 'm--', 'LineWidth', 1);
-        title('Kanal-Kanten (Cyan) | ROI (Magenta)');
-        pause(3); 
+        
+        % 2. Kalibrierung einzeichnen (wenn erfolgreich)
+        if calibSuccess
+            bandRect = [x_margin, y_start, imgW_full - 2*x_margin, y_end - y_start];
+            rectangle('Position', bandRect, 'EdgeColor', 'y', 'LineStyle', '--', 'LineWidth', 1);
+            plot(global_locs, repmat(bestY, size(global_locs)), 'r+', 'MarkerSize', 8, 'LineWidth', 1.5);
+            plot([global_firstTick, global_lastTick], [bestY, bestY], 'go-', 'MarkerSize', 10, 'LineWidth', 2);
+            title(sprintf('Suchband (gelb) | Maßstab (Grün): %.2f mm | ROI (Magenta)', calibDistance_mm));
+        else
+            title('Kanal-Kanten (Cyan) | ROI (Magenta) | KALIBRIERUNG FEHLGESCHLAGEN!', 'Color', 'r');
+        end
+        
+        pause(10); 
         if isgraphics(hFigCalib), close(hFigCalib); end 
     end
 else
