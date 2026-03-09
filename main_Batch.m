@@ -141,6 +141,7 @@ parfor vIdx = 1:length(videoFiles)
                              repmat(recNum, numRowsRes, 1), ...
                              'VariableNames', {'GasVelocity', 'LiquidVelocity', 'CameraPosition', 'FPS', 'RecordNum'});
             resultsTable = [MetaData, resultsTable];
+            
         end
 
         numRowsStats = height(statsTable);
@@ -150,6 +151,7 @@ parfor vIdx = 1:length(videoFiles)
                              repmat(recNum, numRowsStats, 1), ...
                              'VariableNames', {'GasVelocity', 'LiquidVelocity', 'CameraPosition', 'FPS', 'RecordNum'});
             statsTable = [MetaDataStats, statsTable];
+            statsTable.Properties.RowNames = {};
         end
 
         % --- Speichern der Teilergebnisse ---
@@ -195,4 +197,11 @@ function updateProgress(~)
     end
     total = evalin('base', 'length(videoFiles)');
     fprintf('Fortschritt: %d / %d Videos abgeschlossen...\n', pCounter, total);
+end
+
+%% 5. Plots generieren
+if ~isempty(statsCell)
+    plotsDir = fullfile(baseDir, 'Geschwindigkeits_Plots');
+    generate_Batch_Plots(MasterTable_Results, MasterTable_Stats, plotsDir);
+    fprintf('Alle Plots wurden in "%s" gespeichert.\n', plotsDir);
 end
