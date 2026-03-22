@@ -1,4 +1,5 @@
-function [currentBubbleCentroids, channelHeightEstimate, det, currentUC_px] = detect_Bubbles(I, channelHeightEstimate, params)
+function [currentBubbleCentroids, channelHeightEstimate, det, currentUC_px, B_before, B_after] = detect_Bubbles(I, channelHeightEstimate, params)
+
 % DETECT_BUBBLES Erkennt Flüssigkeits-Slugs und misst Unit-Cells im Taylor-Flow.
 %
 % Eingaben:
@@ -20,13 +21,52 @@ function [currentBubbleCentroids, channelHeightEstimate, det, currentUC_px] = de
     
     % Kontrastverbesserung (CLAHE) für robustere Binarisierung
     I_eq = adapthisteq(I, 'NumTiles', [4 8], 'ClipLimit', 0.01);
+
+    % --- NEU: Leichtes Glätten zur Rauschunterdrückung vor dem Binarisieren ---
+    I_eq = medfilt2(I_eq, [3 3]); % Entfernt "Salz & Pfeffer"-Rauschen in den Rändern
     
-    %% 2. Binarisierung & Rauschunterdrückung
-    % Otsu-Methode zur Schwellenwertbildung
-    B = imbinarize(I_eq, graythresh(I_eq));
-    B = imfill(B, 'holes');             % Löcher innerhalb der Objekte füllen
-    B = bwareaopen(B, params.minPixel); % Rauschen (kleine Pixelhaufen) entfernen
+   %% 2. Binarisierung & Rauschunterdrückung
+    if isfield(params, 'sens'), s = params.sens; else, s = 0.5; end
+
+    % NeighborhoodSize abrufen und sicherstellen, dass sie ungerade ist
+    if isfield(params, 'neighborhoodSize')
+        nbSize = floor(size(I_eq, 1) / 2);
+        if mod(nbSize, 2) == 0, nbSize = nbSize - 1; end % Muss ungerade sein
+    else
+        % Fallback: Standardmäßig ca. 1/8 der Bildhöhe (ungerade gemacht)
+        nbSize = 2 * floor(size(I_eq,1)/16) + 1; 
+    end
+
+    % 1. Erstelle die lokale Schwellenwert-Matrix mit adaptthresh
+    T = adaptthresh(I_eq, s, 'ForegroundPolarity', 'bright', 'NeighborhoodSize', [nbSize nbSize]);
     
+    % 2. Binarisiere das Bild anhand dieser genauen Matrix
+    B_before = imbinarize(I_eq, T);
+    
+    % --- NEU: VERTIKALES SCHLIEßEN (Lücken in Y-Richtung füllen) ---
+    if isfield(params, 'closeHeight') && params.closeHeight > 1
+        % Baut einen vertikalen "Balken" (Höhe = closeHeight, Breite = 1)
+        se_vert = strel('rectangle', [params.closeHeight, 1]); 
+        B_before = imopen(B_before, se_vert);
+    end
+    % ---------------------------------------------------------------
+
+    % Fallback, falls der Parameter fehlt
+    if isfield(params, 'closeWidth')
+        w = params.closeWidth; 
+    else
+        w = 1; 
+    end
+
+    % --- KORREKTUR: Morphologisches ÖFFNEN (imopen) ---
+    % Löscht alle weißen Flächen (wie das Blaseninnere), die horizontal 
+    % schmaler sind als 'w'. Die langen weißen Slugs bleiben erhalten.
+    se = strel('rectangle', [1, w]); 
+    B_after = imopen(B_before, se);
+
+    B_after = imfill(B_after, 'holes'); 
+    B = bwareaopen(B_after, params.minPixel);
+
     %% 3. Labeling & Vorfilterung der Objekte
     [L, num] = bwlabel(B);
     
@@ -74,7 +114,7 @@ function [currentBubbleCentroids, channelHeightEstimate, det, currentUC_px] = de
         
         %% 5.1 Plausibilitätsprüfungen (Geometrie & Lage)
         % Das Objekt muss mindestens 80% der ermittelten Kanalhöhe einnehmen
-        if bb(4) < 0.80 * channelHeightEstimate
+        if bb(4) < 0.90 * channelHeightEstimate
             continue; 
         end
         
@@ -87,12 +127,16 @@ function [currentBubbleCentroids, channelHeightEstimate, det, currentUC_px] = de
         sol = statsFull(k).Solidity; 
         ecc = statsFull(k).Eccentricity; 
         ori = statsFull(k).Orientation;
-        
+       
         if ~(sol >= params.minSolid && sol <= params.maxSolid && ...
              ecc >= params.minEcc && abs(ori) >= params.minAngle)
             continue; 
         end
-        
+        % Ignoriere Objekte, die den linken oder rechten Bildrand berühren (abgeschnitten sind)
+        if bb(1) <= 1 || (bb(1) + bb(3)) >= imgW
+            continue;
+        end
+
         %% 5.2 Lokale Kantenbestimmung über den Perimeter
         % Begrenzungsbox auf Bildränder beschneiden, um Fehler zu vermeiden
         bx0 = max(1, floor(bb(1))); 
@@ -111,7 +155,7 @@ function [currentBubbleCentroids, channelHeightEstimate, det, currentUC_px] = de
             continue; 
         end
         
-        %% 5.3 Präzise Identifikation der linken und rechten Kante
+                %% 5.3 Präzise Identifikation der linken und rechten Kante
         cx_local = statsFull(k).Centroid(1) - bx0 + 1; % Lokaler Mittelpunkt (X)
         spanY = max(rP) - min(rP);                     % Höhe des Perimeters
         midY = (min(rP)+max(rP))/2;                    % Vertikale Mitte des Objekts
@@ -133,18 +177,35 @@ function [currentBubbleCentroids, channelHeightEstimate, det, currentUC_px] = de
             continue; 
         end
         
-        % Extremalpunkte ermitteln (rechtester Pixel links, linkester Pixel rechts)
-        left_x_local = max(cBand(leftMask));
-        right_x_local = min(cBand(rightMask));
+        % --- NEU: Umsetzung deiner Idee (Robust gegen Partikel) ---
+        % Statt einfach den extremsten Punkt zu nehmen (max/min), bestimmen wir 
+        % für jede Y-Höhe im Toleranzband den Randpunkt und nehmen den Median.
         
-        % Ergebnisse in die struct-Liste speichern (Rückrechnung auf globale Bildkoordinaten)
+        % 1. Linke Kante
+        y_left = unique(rBand(leftMask));
+        x_left_profile = zeros(size(y_left));
+        for i = 1:length(y_left)
+            x_left_profile(i) = max(cBand(leftMask & rBand == y_left(i))); % Der rechteste Punkt pro Y-Höhe
+        end
+        left_x_local = round(median(x_left_profile)); % Median ignoriert Partikel-Spitzen!
+        
+        % 2. Rechte Kante
+        y_right = unique(rBand(rightMask));
+        x_right_profile = zeros(size(y_right));
+        for i = 1:length(y_right)
+            x_right_profile(i) = min(cBand(rightMask & rBand == y_right(i))); % Der linkeste Punkt pro Y-Höhe
+        end
+        right_x_local = round(median(x_right_profile));
+        
+        % Ergebnisse in die struct-Liste speichern
         det(end+1) = struct( ...
             'cx', statsFull(k).Centroid(1), ...
             'leftX', left_x_local + bx0 - 1, ...
-            'leftY', round(mean(rBand(cBand == left_x_local))) + by0 - 1, ...
+            'leftY', round(midY) + by0 - 1, ...  % Y-Koordinate fest in die Mitte setzen
             'rightX', right_x_local + bx0 - 1, ...
-            'rightY', round(mean(rBand(cBand == right_x_local))) + by0 - 1, ...
+            'rightY', round(midY) + by0 - 1, ... % Y-Koordinate fest in die Mitte setzen
             'bb', [bx0 by0 (bx1-bx0+1) (by1-by0+1)]);
+
     end
     
     %% 6. Auswertung der erkannten Objekte
@@ -157,29 +218,39 @@ function [currentBubbleCentroids, channelHeightEstimate, det, currentUC_px] = de
     [~, sIdx] = sort([det.cx], 'descend');
     det = det(sIdx);
     
-    %% 7. Berechnung von Unit-Cells und Slug-Zentren
+    %% 7. Berechnung von Unit-Cells (Gekoppeltes Tracking)
     for j = 1:(numel(det)-1)
-        bbLeft = det(j).bb; 
+        bbLeft = det(j).bb;
         bbRight = det(j+1).bb;
-        
+
         % Slugs am Bildrand ignorieren (könnten abgeschnitten und verfälscht sein)
         if bbLeft(1) <= params.borderMargin || (bbRight(1) + bbRight(3)) >= (imgW - params.borderMargin)
-            continue; 
+            continue;
         end
-        
-        % Kanten für die Messung extrahieren:
-        % det(j) ist die linke Grenze der Messstrecke, det(j+1) die rechte
-        x_e = det(j+1).rightX; 
-        x_s = det(j).leftX;    
-        len_px = x_s - x_e; % Abstand zwischen rechter und linker Kante (Slug-Länge)
-        
-        if len_px > 0
-            % X-Mittelpunkt und Länge der Blase speichern
-            mid_x = (x_e + x_s) / 2;
-            currentBubbleCentroids = [currentBubbleCentroids; mid_x, len_px]; %#ok<AGROW>
-            
-            % Unit Cell: Distanz zwischen den linken Kanten von Slug j und Slug j+1
-            currentUC_px = [currentUC_px; abs(det(j).leftX - det(j+1).leftX)]; %#ok<AGROW>
+
+        % --- 1. Unit Cell (UC) definieren ---
+        % Die UC beginnt an der linken Kante des aktuellen Slugs j und endet an der linken Kante von j+1
+        uc_start_x = det(j).leftX;
+        uc_end_x = det(j+1).leftX;
+
+        % Länge der gesamten Unit Cell
+        uc_len_px = abs(uc_start_x - uc_end_x);
+
+        % --- 2. Blase innerhalb dieser UC messen ---
+        % Die Blase liegt zwischen der rechten Kante von j+1 und der linken Kante von j
+        bubble_right_x = det(j+1).rightX;
+        bubble_left_x = det(j).leftX;
+        bubble_len_px = bubble_left_x - bubble_right_x;
+
+        if bubble_len_px > 0 && uc_len_px > bubble_len_px
+            % --- 3. Daten koppeln und speichern ---
+            % Statt des Blasen-Mittelpunkts nehmen wir nun uc_start_x als Referenz-Koordinate!
+            % Struktur: [X_Position, Bubble_Length, UC_Length]
+            currentBubbleCentroids = [currentBubbleCentroids; uc_start_x, bubble_len_px, uc_len_px]; %#ok
+
+            % (Optional: currentUC_px als separaten Vektor behalten, falls main_Batch ihn noch braucht)
+            currentUC_px = [currentUC_px; uc_len_px]; %#ok
         end
     end
+
 end

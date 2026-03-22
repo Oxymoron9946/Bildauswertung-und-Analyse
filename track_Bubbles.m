@@ -25,8 +25,9 @@ function [bubbleTracker, prevBubbleCentroids, nextBubbleID] = track_Bubbles(curr
 
     %% 2. Zuweisungsschleife ueber alle aktuellen Blasen
     for c = 1:size(currentBubbleCentroids, 1)
-        currX   = currentBubbleCentroids(c, 1);
+        currX = currentBubbleCentroids(c, 1);
         currLen = currentBubbleCentroids(c, 2);
+        currUC = currentBubbleCentroids(c, 3); % NEU: Unit-Cell Länge auslesen
         assignedID = -1;
 
         %% 2.1 Abgleich mit bekannten Blasen aus dem vorherigen Frame
@@ -58,8 +59,9 @@ function [bubbleTracker, prevBubbleCentroids, nextBubbleID] = track_Bubbles(curr
         end
 
         %% 2.3 Ergebnisse des aktuellen Frames protokollieren
-        % Format: [BubbleID, FrameIndex, PositionX_px, Laenge_px]
-        bubbleTracker = [bubbleTracker; assignedID, frameIdx, currX, currLen]; %#ok<AGROW>
+        % Format: [BubbleID, FrameIndex, PositionX_px, Bubble_Laenge_px, UC_Laenge_px]
+        bubbleTracker = [bubbleTracker; assignedID, frameIdx, currX, currLen, currUC]; %#ok
+
 
         % Uebergabe an den naechsten Frame vorbereiten [ID, PositionX]
         newPrevBubbleCentroids = [newPrevBubbleCentroids; assignedID, currX]; %#ok<AGROW>

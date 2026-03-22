@@ -3,12 +3,13 @@ clc; close all; clear;
 
 %% 1. Parameter & Konfiguration
 % Wichtig: Die Pfade und FPS muessen an das jeweilige Video angepasst werden
-params.videoFile = 'Test\test_80.avi';
+params.videoFile = 'Test\0,19_0,194_Pos_1.avi';
+params.calibFile = 'Test\Kalibrierung_1_Pos_1.avi';
 params.fps = 200; % Entsprechend der Kamera-Einstellung (z.B. 200 oder 500)
 
 % Visualisierung und Kontrolle
 params.showCalibrationImage  = false; % Pop-up zur Ueberpruefung von ROI und Lineal
-params.showVisuals           = false; % Live-Tracking an/aus (verlangsamt die Auswertung)
+params.showVisuals           = true; % Live-Tracking an/aus (verlangsamt die Auswertung)
 params.visualizeEveryNFrames = 10;    % Nur jeden X-ten Frame zeichnen
 params.dimOffsetY            = 45;    % Y-Offset fuer die Masslinien in der Visualisierung
 
@@ -16,10 +17,10 @@ params.dimOffsetY            = 45;    % Y-Offset fuer die Masslinien in der Visu
 params.minPixel     = 50;   % Minimum an Pixeln fuer ein Objekt
 params.minArea      = 100;  % Minimum-Flaeche
 params.minSolid     = 0.50; % Kompaktheit (Solidity)
-params.maxSolid     = 0.98;
+params.maxSolid     = 0.94;
 params.minEcc       = 0.05; % Exzentrizitaet (Abweichung von der Kreisform)
 params.minAngle     = 0;    % Mindestwinkel
-params.toleranceY   = 0.1;  % Toleranzband in der Mitte der Blase fuer die Kantenfindung
+params.toleranceY   = 0.2;  % Toleranzband in der Mitte der Blase fuer die Kantenfindung
 params.borderMargin = 2;    % Pixelabstand vom Bildrand, bei dem Blasen ignoriert werden
 
 % Tracking Parameter
@@ -28,27 +29,49 @@ params.minFramesTracked = 10; % Mindestanzahl an Frames fuer gueltige Geschwindi
 
 % Position und physikalisches Binning
 params.kanalStart_mm = 0; % Position des rechten Bildrandes (Einlass) in mm
-params.binSize_mm    = 3; % Rastergroesse fuer die Fehlerbalken-Statistik
+params.binSize_mm    = 4; % Rastergroesse fuer die Fehlerbalken-Statistik
 
+% PARAMETER FÜR BLASEN-FÜLLUNG (Möglichkeit 2) ---
+params.closeWidth = 3;          % Breite des Schließ-Werkzeugs in Pixeln
+params.closeHeight = 3;         % NEU: Höhe des Schließ-Werkzeugs (vertikal) zum Füllen vertikaler Lücken
+params.showBinarySteps = true;   % Zeigt das Binärbild vor und nach dem Schließen
+
+% --- ADAPTIVE SCHWELLENWERT-PARAMETER ---
+params.sens = 0.7;              % Sensitivität (0 bis 1, höher = mehr Weiß)
+params.neighborhoodSize = 51;    % NEU: Fenstergröße für lokalen Kontrast (MUSS ungerade sein!)
 %% 2. Video initialisieren & Kalibrierung
-v = VideoReader(params.videoFile);
-firstFrame = readFrame(v);
-v.CurrentTime = 0;
+v_calib = VideoReader(params.calibFile);
+firstFrameCalib = readFrame(v_calib);
 
-if ndims(firstFrame) == 3
-    firstFrameGray = rgb2gray(firstFrame); 
+if ndims(firstFrameCalib) == 3
+    firstFrameGray = rgb2gray(firstFrameCalib);
 else
-    firstFrameGray = firstFrame; 
+    firstFrameGray = firstFrameCalib;
 end
 
-fprintf('Starte Kalibrierung und ROI-Erkennung...\n');
-[px2mm, roi, calibSuccess] = setup_Calibration(firstFrameGray, params.showCalibrationImage);
+fprintf('Starte Kalibrierung...\n');
+% Die Funktion gibt keine ROI mehr zurück
+[px2mm, calibSuccess] = setup_Calibration(firstFrameGray, params.showCalibrationImage);
 
 if ~calibSuccess || isnan(px2mm)
     error('Automatische Kalibrierung fehlgeschlagen. Abbruch der Auswertung.');
 else
     fprintf('Kalibrierung erfolgreich: %.5f mm/px\n', px2mm);
 end
+
+v = VideoReader(params.videoFile);
+v.CurrentTime = 0; % Sicherstellen, dass das Video von vorne beginnt
+
+imgH = v.Height;
+imgW = v.Width;
+roi.y0 = 1;
+roi.y1 = imgH;
+roi.x0 = 1;
+roi.x1 = imgW;
+
+roiHeight_px = roi.y1 - roi.y0 + 1;
+roiHeight_mm = roiHeight_px * px2mm;
+fprintf('Höhe des Bildausschnitts (ROI): %d Pixel (%.3f mm)\n', roiHeight_px, roiHeight_mm);
 
 %% 3. Tracking Schleife (Frame by Frame)
 bubbleTracker         = []; 
@@ -79,8 +102,8 @@ while hasFrame(v)
     I_roi = I_full(roi.y0:roi.y1, roi.x0:roi.x1);
 
     %% 3.1 Blasen-Detektion
-    [currentBubbleCentroids, channelHeightEstimate, det, currentUC_px] = ...
-        detect_Bubbles(I_roi, channelHeightEstimate, params);
+    [currentBubbleCentroids, channelHeightEstimate, det, currentUC_px, B_before, B_after] = ...
+    detect_Bubbles(I_roi, channelHeightEstimate, params);
 
     if ~isempty(currentUC_px)
         % Pixel-Abstaende direkt in mm umrechnen und sammeln
@@ -133,28 +156,45 @@ while hasFrame(v)
 
         hold(hAx, 'off'); 
         drawnow;
+                % --- NEU: Visualisierung der Binärbild-Schritte ---
+        if isfield(params, 'showBinarySteps') && params.showBinarySteps
+            if ~exist('hFigBin', 'var') || ~isvalid(hFigBin)
+                hFigBin = figure('Name', 'Binärbild-Kontrolle', 'Position', [100 550 1000 300]);
+            end
+            figure(hFigBin);
+            subplot(2,1,1); 
+            imshow(I_roi); % Zeigt das echte Graustufenbild als Referenz
+            title('Graustufenbild (Original ROI)');
+            
+            subplot(2,1,2); 
+            % 'B_after' muss aus detect_Bubbles zurückgegeben werden
+            imshow(B_after); 
+            title(sprintf('Binarisiert (Sens=%.2f, NbSize=%d)', params.sens, params.neighborhoodSize));
+        end
     end
 end
 
 elapsedTime = toc(startTime);
 fprintf('Tracking abgeschlossen in %.1f Sekunden (%d Frames).\n', elapsedTime, frameIdx);
 
-%% 4. Auswertung der gekoppelten Physik
-imgW = roi.x1 - roi.x0 + 1; 
-
+%% 4. Auswertung der Physik (Laengen & Geschwindigkeiten)
+imgW = roi.x1 - roi.x0 + 1;
 if isempty(collected_UC_mm)
     warning('Keine Unit Cells detektiert! Setze mean_UC auf NaN.');
-    mean_UC_mm = NaN; 
+    mean_UC_mm = NaN;
 else
-    mean_UC_mm = mean(collected_UC_mm); 
+    mean_UC_mm = mean(collected_UC_mm);
     fprintf('--- Unit Cell (UC) Auswertung ---\n');
     fprintf('Mittelwert der Unit Cell Laenge (L_uc): %.3f mm\n\n', mean_UC_mm);
 end
 
+% Aufruf der aktualisierten evaluate_Physics
 [resultsTable, statsTable] = evaluate_Physics(bubbleTracker, px2mm, params.fps, ...
     params.minFramesTracked, imgW, params.kanalStart_mm, params.binSize_mm, mean_UC_mm);
 
 %% 5. Visualisierung & Speichern der Ergebnisse
 visualize_Results(resultsTable, statsTable);
-writetable(statsTable, 'Statistik_Ergebnisse_Kanallaenge.csv');
-fprintf('Ergebnisse als "Statistik_Ergebnisse_Kanallaenge.csv" gespeichert.\n');
+if ~isempty(statsTable)
+    writetable(statsTable, 'Statistik_Ergebnisse_Kanallaenge.csv');
+    fprintf('Ergebnisse als "Statistik_Ergebnisse_Kanallaenge.csv" gespeichert.\n');
+end

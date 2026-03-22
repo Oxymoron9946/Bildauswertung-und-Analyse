@@ -1,207 +1,189 @@
-%% Parallele Batch-Auswertung (Gekoppelte Physik - Bereinigt)
+%% Parallele Batch-Auswertung (Nur Geometrie & Längen)
 clc; close all; clear;
 
-%% 1. Parameter & Konfiguration (Ohne Visualisierungs-Overhead)
+%% 1. Parameter & Konfiguration
 % Filter für Flüssigkeits-Slugs
-params.minPixel   = 50;
-params.minArea    = 100;
-params.minSolid   = 0.50; 
-params.maxSolid   = 0.98;
-params.minEcc     = 0.05;
-params.minAngle   = 0; 
+params.minPixel = 50;
+params.minArea = 100;
+params.minSolid = 0.50; 
+params.maxSolid = 0.94;
+params.minEcc = 0.05;
+params.minAngle = 0; 
 params.toleranceY = 0.1;
 params.borderMargin = 2;
 
 % Tracking Parameter
-params.maxJumpDist_px   = 50; 
+params.maxJumpDist_px = 50; 
 params.minFramesTracked = 10; 
 
-% Position und Binning
-params.kanalStart_mm = 0; 
-params.binSize_mm    = 3; 
-params.fps           = 200; % Fallback, falls nicht aus dem Ordner extrahiert
+% Binning
+params.binSize_mm = 2; 
+params.fps = 200; % Fallback
+
+% Füllen (Möglichkeit 2)
+params.closeWidth = 3; 
+params.closeHeight = 3; 
+params.showBinarySteps = true; 
+
+% Adaptive Threshold
+params.sens = 0.7; 
+params.neighborhoodSize = 51; 
 
 %% 2. Batch-Parameter & Ordnerwahl
 baseDir = uigetdir('', 'Bitte den Hauptordner (z.B. "Glaskanal") auswählen');
 if baseDir == 0, return; end
 
-% Alle passenden .avi-Dateien im Verzeichnis und Unterverzeichnissen suchen
 allVideoFiles = dir(fullfile(baseDir, '**', 'XSM-3520 Camera 0330_*.avi'));
 if isempty(allVideoFiles)
     error('Keine passenden .avi Dateien gefunden!');
 end
 
-% --- FILTERN DER DATEIEN (Nur alles außer 500fps) ---
-validFiles = [];
+% --- KALIBRIERUNGEN VORBEREITEN ---
+calibMap = containers.Map('KeyType', 'char', 'ValueType', 'double');
+fprintf('\n--- Lese Kalibrierungen ein ---\n');
+calibVideoFiles = dir(fullfile(baseDir, '**', 'Kalibrierung_*', '*.avi'));
+for c = 1:length(calibVideoFiles)
+    cFolder = calibVideoFiles(c).folder;
+    cName = calibVideoFiles(c).name;
+    tok = regexp(cFolder, '(Pos_\d+_Kal_\d+)', 'tokens');
+    if ~isempty(tok)
+        groupName = tok{1}{1};
+        vcalib = VideoReader(fullfile(cFolder, cName));
+        firstFrameCalib = readFrame(vcalib);
+        if ndims(firstFrameCalib) == 3
+            firstFrameCalib = rgb2gray(firstFrameCalib);
+        end
+        [px2mm_calib, calibSuccess] = setup_Calibration(firstFrameCalib, false);
+        if calibSuccess
+            calibMap(groupName) = px2mm_calib;
+            fprintf('Gruppe %s: %.5f mm/px\n', groupName, px2mm_calib);
+        end
+    end
+end
+fprintf('--------------------------------\n\n');
+
+% Messvideos filtern
+videoFiles = [];
 for i = 1:length(allVideoFiles)
-    if ~contains(allVideoFiles(i).folder, '500fps')
-        validFiles = [validFiles; allVideoFiles(i)]; %#ok<AGROW>
+    if ~contains(allVideoFiles(i).folder, 'Kalibrierung_')
+        videoFiles = [videoFiles; allVideoFiles(i)]; %#ok<AGROW>
     end
 end
 
-if isempty(validFiles)
-    error('Nach dem Filtern sind keine Dateien mehr übrig!');
-end
-
-videoFiles = validFiles; 
-fprintf('Starte parallele Batch-Auswertung für alle %d gefundenen Videos (ohne 500fps)...\n', length(videoFiles));
-
-% Cell Arrays für Ergebnisse koordinieren (Parallelbetrieb)
+fprintf('Starte parallele Batch-Auswertung für %d Messvideos...\n', length(videoFiles));
 resultsCell = cell(length(videoFiles), 1);
 statsCell = cell(length(videoFiles), 1);
 
 %% 3. Parallele Hauptschleife (parfor)
 D = parallel.pool.DataQueue;
-totalVideos = length(videoFiles);
-afterEach(D, @updateProgress); 
+afterEach(D, @(~) fprintf('.')); 
 
 parfor vIdx = 1:length(videoFiles)
-    % --- Dateipfade und Metadaten ---
     videoFile = fullfile(videoFiles(vIdx).folder, videoFiles(vIdx).name);
-
+    groupTok = regexp(videoFile, '(Pos_\d+_Kal_\d+)', 'tokens');
+    if isempty(groupTok)
+        continue;
+    end
+    groupName = groupTok{1}{1};
+    
     folders = strsplit(videoFiles(vIdx).folder, filesep);
     paramFolder = folders{end-1};
-    fpsFolder = folders{end};
-
-    paramTokens = regexp(paramFolder, '(?<gas>[\d,]+)_(?<liq>[\d,]+)_Position_(?<pos>\d+)', 'names');
-    fpsTokens = regexp(fpsFolder, '(?<fps>\d+)fps_(?<rec>\d+)', 'names');
-
-    if isempty(paramTokens) || isempty(fpsTokens)
-        vGasStr = "NaN"; vLiqStr = "NaN"; posNum = NaN; fps_val = params.fps; recNum = "NaN";
+    
+    paramTokens = regexp(paramFolder, '(?<gas>[\d,]+)_(?<liq>[\d,]+)_Pos_(?<pos>\d+)', 'names');
+    if isempty(paramTokens)
+        vGasStr = "NaN"; vLiqStr = "NaN"; posNum = NaN; 
     else
         vGasStr = string(paramTokens.gas);
         vLiqStr = string(paramTokens.liq);
         posNum = str2double(paramTokens.pos);
-        fps_val = str2double(fpsTokens.fps);
-        recNum = string(fpsTokens.rec);
     end
 
-    % Lokale Kopie der Parameter für parfor
     localParams = params;
     localParams.videoFile = videoFile;
-    localParams.fps = fps_val; 
-
+    
     try
-        % --- Video initialisieren & Setup ---
         v = VideoReader(localParams.videoFile);
-        firstFrame = readFrame(v);
         v.CurrentTime = 0;
-
-        if ndims(firstFrame) == 3, firstFrameGray = rgb2gray(firstFrame); 
-        else, firstFrameGray = firstFrame; end
-
-        % Kalibrierung (hartkodiert: keine Visualisierung -> false)
-        [px2mm, roi, calibSuccess] = setup_Calibration(firstFrameGray, false);
-
-        if ~calibSuccess
-            px2mm = 1; % Fallback
+        
+        if isKey(calibMap, groupName)
+            px2mm = calibMap(groupName);
+        else
+            error('Keine Kalibrierung vorhanden.');
         end
-
-        % --- Tracking Schleife ---
+        
+        % Absolute Position berechnen
+        if posNum == 1
+            localParams.kanalStart_mm = 0;
+        elseif posNum == 2
+            localParams.kanalStart_mm = 181.5 * 1.05;
+        elseif posNum == 3
+            localParams.kanalStart_mm = 415.5 * 1.05;
+        else
+            localParams.kanalStart_mm = 0;
+        end
+        
+        imgH = v.Height; imgW = v.Width;
+        roi = struct('y0', 1, 'y1', imgH, 'x0', 1, 'x1', imgW);
+        
         bubbleTracker = []; 
         nextBubbleID = 1;
         prevBubbleCentroids = []; 
         channelHeightEstimate = NaN; 
-        collected_UC_mm = []; 
         frameIdx = 0;
-
+        
         while hasFrame(v)
             frameIdx = frameIdx + 1;
             I_full = readFrame(v);
             if ndims(I_full) == 3, I_full = rgb2gray(I_full); end
-
-            % ROI ausschneiden
             I_roi = I_full(roi.y0:roi.y1, roi.x0:roi.x1);
-
-            % Blasen detektieren
-            [currentBubbleCentroids, channelHeightEstimate, det, currentUC_px] = ...
+            
+            % HIER GEÄNDERT: detect_Bubbles liefert nun 5-spaltige Centroids (inkl UC)
+            [currentBubbleCentroids, channelHeightEstimate, ~, ~] = ...
                 detect_Bubbles(I_roi, channelHeightEstimate, localParams);
-
-            if ~isempty(currentUC_px)
-                collected_UC_mm = [collected_UC_mm; currentUC_px * px2mm]; %#ok<AGROW>
-            end
-
-            % Tracking
+            
             [bubbleTracker, prevBubbleCentroids, nextBubbleID] = track_Bubbles(...
                 currentBubbleCentroids, prevBubbleCentroids, bubbleTracker, nextBubbleID, frameIdx, localParams.maxJumpDist_px);
         end
-
-        % --- Auswertung der gekoppelten Physik ---
+        
         imgW = roi.x1 - roi.x0 + 1; 
-        if isempty(collected_UC_mm), mean_UC_mm = NaN; else, mean_UC_mm = mean(collected_UC_mm); end
-
+        mean_UC_mm = NaN; % Wird im neuen evaluate_Physics nicht mehr global benötigt!
+        
+        % HIER GEÄNDERT: evaluate_Physics rechnet nun Blasen- & Sluglängen!
         [resultsTable, statsTable] = evaluate_Physics(bubbleTracker, px2mm, localParams.fps, ...
             localParams.minFramesTracked, imgW, localParams.kanalStart_mm, localParams.binSize_mm, mean_UC_mm);
-
-        % --- Metadaten anhängen ---
-        numRowsRes = height(resultsTable);
-        if numRowsRes > 0
-            MetaData = table(repmat(vGasStr, numRowsRes, 1), repmat(vLiqStr, numRowsRes, 1), ...
-                             repmat(posNum, numRowsRes, 1), repmat(fps_val, numRowsRes, 1), ...
-                             repmat(recNum, numRowsRes, 1), ...
-                             'VariableNames', {'GasVelocity', 'LiquidVelocity', 'CameraPosition', 'FPS', 'RecordNum'});
-            resultsTable = [MetaData, resultsTable];
-            
-        end
-
+        
+        % Metadaten anhängen (NUR Gas, Liq, Pos -> P und T macht Python!)
         numRowsStats = height(statsTable);
         if numRowsStats > 0
             MetaDataStats = table(repmat(vGasStr, numRowsStats, 1), repmat(vLiqStr, numRowsStats, 1), ...
-                             repmat(posNum, numRowsStats, 1), repmat(fps_val, numRowsStats, 1), ...
-                             repmat(recNum, numRowsStats, 1), ...
-                             'VariableNames', {'GasVelocity', 'LiquidVelocity', 'CameraPosition', 'FPS', 'RecordNum'});
+                             repmat(posNum, numRowsStats, 1), ...
+                             'VariableNames', {'GasVelocity', 'LiquidVelocity', 'CameraPosition'});
             statsTable = [MetaDataStats, statsTable];
             statsTable.Properties.RowNames = {};
         end
-
-        % --- Speichern der Teilergebnisse ---
-        resultsCell{vIdx} = resultsTable;
+        
         statsCell{vIdx} = statsTable;
-
+        
     catch ME
-        warning('Fehler bei Video %d (%s): %s', vIdx, videoFile, ME.message);
+        warning('Fehler bei Video %d: %s', vIdx, ME.message);
     end
-
-    % Fortschritt aktualisieren
     send(D, vIdx); 
 end
+fprintf('\n');
 
 %% 4. Ergebnisse zusammenfassen und speichern
-fprintf('\n--- Fasse Daten zusammen ---\n');
-
-% Leere Einträge (z.B. wegen Fehlern) entfernen
-resultsCell = resultsCell(~cellfun('isempty', resultsCell));
-statsCell = statsCell(~cellfun('isempty', statsCell));
-
-if ~isempty(resultsCell)
-    MasterTable_Results = vertcat(resultsCell{:});
-    writetable(MasterTable_Results, fullfile(baseDir, 'Gesamtauswertung_Ergebnisse.csv'));
-    fprintf('Gesamte Ergebnisse gespeichert in: Gesamtauswertung_Ergebnisse.csv\n');
-end
+validStatsIdx = cellfun(@(x) ~isempty(x) && istable(x) && height(x) > 0, statsCell);
+statsCell = statsCell(validStatsIdx);
 
 if ~isempty(statsCell)
-    MasterTable_Stats = vertcat(statsCell{:});
-    writetable(MasterTable_Stats, fullfile(baseDir, 'Gesamtauswertung_Statistik.csv'));
-    fprintf('Gesamte Statistik gespeichert in: Gesamtauswertung_Statistik.csv\n');
-end
-
-fprintf('Batch-Auswertung erfolgreich beendet.\n');
-
-%% Hilfsfunktion für den Konsolen-Fortschritt (DataQueue)
-function updateProgress(~)
-    persistent pCounter;
-    if isempty(pCounter)
-        pCounter = 1;
-    else
-        pCounter = pCounter + 1;
-    end
-    total = evalin('base', 'length(videoFiles)');
-    fprintf('Fortschritt: %d / %d Videos abgeschlossen...\n', pCounter, total);
-end
-
-%% 5. Plots generieren
-if ~isempty(statsCell)
+    MasterTableStats = vertcat(statsCell{:});
+    writetable(MasterTableStats, fullfile(baseDir, 'Gesamtauswertung_Statistik.csv'), 'Delimiter', ';');
+    fprintf('Gesamte Statistik gespeichert in Gesamtauswertung_Statistik.csv\n');
+    
+    % HIER GEÄNDERT: Neue Plotfunktion aufrufen
     plotsDir = fullfile(baseDir, 'Geschwindigkeits_Plots');
-    generate_Batch_Plots(MasterTable_Results, MasterTable_Stats, plotsDir);
-    fprintf('Alle Plots wurden in "%s" gespeichert.\n', plotsDir);
+    generate_Batch_Plots(table(), MasterTable_Stats, plotsDir);
+    fprintf('Batch-Auswertung erfolgreich beendet.\n');
+else
+    fprintf('Keine validen Daten zur Speicherung gefunden.\n');
 end
