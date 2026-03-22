@@ -1,6 +1,7 @@
 %% Parallele Batch-Auswertung (Nur Geometrie & Längen)
 clc; close all; clear;
 
+batchRunID = now;
 %% 1. Parameter & Konfiguration
 % Filter für Flüssigkeits-Slugs
 params.minPixel = 50;
@@ -182,7 +183,7 @@ if ~isempty(statsCell)
     
     % HIER GEÄNDERT: Neue Plotfunktion aufrufen
     plotsDir = fullfile(baseDir, 'Geschwindigkeits_Plots');
-    generate_Batch_Plots(table(), MasterTable_Stats, plotsDir);
+    generate_Batch_Plots(table(), MasterTableStats, plotsDir);
     fprintf('Batch-Auswertung erfolgreich beendet.\n');
 else
     fprintf('Keine validen Daten zur Speicherung gefunden.\n');
