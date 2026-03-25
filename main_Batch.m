@@ -1,39 +1,63 @@
-%% Parallele Batch-Auswertung (Nur Geometrie & Längen)
+%% Parallele Batch-Auswertung (Inkl. Metadaten- & Setup-Integration)
 clc; close all; clear;
 
-batchRunID = now;
-%% 1. Parameter & Konfiguration
-% Filter für Flüssigkeits-Slugs
-params.minPixel = 50;
-params.minArea = 100;
-params.minSolid = 0.50; 
-params.maxSolid = 0.94;
-params.minEcc = 0.05;
-params.minAngle = 0; 
-params.toleranceY = 0.1;
-params.borderMargin = 2;
+% -------------------------------------------------------------------------
+% 0. PFADE ZU DEN METADATEN-DATEIEN (HIER ANPASSEN!)
+% -------------------------------------------------------------------------
+% Fester Pfad zu deinem aus Excel exportierten Laborbuch
+laborbuchPath = 'C:\Pfad\zu\deinem\Laborbuch.csv'; 
+
+% Pfad zur Setup-Konfiguration (liegt am besten im selben Ordner wie das Skript)
+setupPath = fullfile(pwd, 'Setup_Konfiguration.csv'); 
+
+% -------------------------------------------------------------------------
+% 1. PARAMETER & KONFIGURATION
+% -------------------------------------------------------------------------
+% Filter für Flüssigkeits-Slugs / Blasen (Rauschen filtern)
+params.minPixel = 50;        % Mindestanzahl an Pixeln, damit etwas als Blase zählt
+params.minArea = 100;        % Mindestfläche in Pixeln
+params.toleranceY = 0.1;     % Toleranz für Abweichungen in der Y-Achse (verhindert Tracking von Artefakten am Rand)
 
 % Tracking Parameter
-params.maxJumpDist_px = 50; 
-params.minFramesTracked = 10; 
+params.maxJumpDist_px = 50;  % Maximale Pixel, die sich eine Blase zwischen zwei Frames bewegen darf
+params.minFramesTracked = 10; % Eine Blase muss mindestens in 10 Frames zu sehen sein (verhindert Geister-Tracking)
 
-% Binning
-params.binSize_mm = 2; 
-params.fps = 200; % Fallback
+% Physik & Bildverarbeitung
+params.binSize_mm = 2;       % Größe der Bins für die örtliche Mittelung
+params.fps = 200;            % Standard Framerate (falls nicht auslesbar)
 
-% Füllen (Möglichkeit 2)
-params.closeWidth = 3; 
-params.closeHeight = 3; 
-params.showBinarySteps = true; 
+% Wichtige Tuning-Parameter für die Bildverarbeitung (Morphologische Operationen)
+params.closeWidth = 3;       % Schließt Risse in der Blase in X-Richtung
+params.closeHeight = 5;      % Schließt Risse in der Blase in Y-Richtung
+params.sens = 0.85;          % Sensitivität für den Adaptive Threshold (0-1). Höher = sensitiver für dunkle Ränder.
 
-% Adaptive Threshold
-params.sens = 0.7; 
-params.neighborhoodSize = 51; 
+% -------------------------------------------------------------------------
+% 2. TABELLEN EINLESEN (Laborbuch & Setup)
+% -------------------------------------------------------------------------
+fprintf('--- Lade Konfigurationsdateien ---\n');
 
-%% 2. Batch-Parameter & Ordnerwahl
+% Lese Laborbuch ein (VariableNamingRule erhält die exakten Spaltennamen wie 'CO2-Anteil')
+if ~isfile(laborbuchPath)
+    error('Laborbuch nicht gefunden unter: %s', laborbuchPath);
+end
+labTable = readtable(laborbuchPath, 'Delimiter', ';', 'VariableNamingRule', 'preserve');
+fprintf('Laborbuch geladen: %d Einträge gefunden.\n', height(labTable));
+
+% Lese Setup-Konfiguration ein
+if ~isfile(setupPath)
+    error('Setup-Konfiguration nicht gefunden unter: %s', setupPath);
+end
+setupTable = readtable(setupPath, 'Delimiter', ';', 'VariableNamingRule', 'preserve');
+fprintf('Setup-Konfiguration geladen: %d Hardware-Setups gefunden.\n', height(setupTable));
+fprintf('----------------------------------\n\n');
+
+% -------------------------------------------------------------------------
+% 3. BATCH-PARAMETER & ORDNERWAHL (Videos)
+% -------------------------------------------------------------------------
 baseDir = uigetdir('', 'Bitte den Hauptordner (z.B. "Glaskanal") auswählen');
 if baseDir == 0, return; end
 
+% Finde alle .avi Dateien im gewählten Ordner und Unterordnern
 allVideoFiles = dir(fullfile(baseDir, '**', 'XSM-3520 Camera 0330_*.avi'));
 if isempty(allVideoFiles)
     error('Keine passenden .avi Dateien gefunden!');
@@ -46,6 +70,7 @@ calibVideoFiles = dir(fullfile(baseDir, '**', 'Kalibrierung_*', '*.avi'));
 for c = 1:length(calibVideoFiles)
     cFolder = calibVideoFiles(c).folder;
     cName = calibVideoFiles(c).name;
+    % Extrahiere die Gruppe (z.B. Pos_1_Kal_1)
     tok = regexp(cFolder, '(Pos_\d+_Kal_\d+)', 'tokens');
     if ~isempty(tok)
         groupName = tok{1}{1};
@@ -54,6 +79,7 @@ for c = 1:length(calibVideoFiles)
         if ndims(firstFrameCalib) == 3
             firstFrameCalib = rgb2gray(firstFrameCalib);
         end
+        % Kalibrierungsfunktion aufrufen
         [px2mm_calib, calibSuccess] = setup_Calibration(firstFrameCalib, false);
         if calibSuccess
             calibMap(groupName) = px2mm_calib;
@@ -63,44 +89,130 @@ for c = 1:length(calibVideoFiles)
 end
 fprintf('--------------------------------\n\n');
 
-% Messvideos filtern
+% Messvideos von Kalibriervideos trennen
 videoFiles = [];
 for i = 1:length(allVideoFiles)
     if ~contains(allVideoFiles(i).folder, 'Kalibrierung_')
-        videoFiles = [videoFiles; allVideoFiles(i)]; %#ok<AGROW>
+        videoFiles = [videoFiles; allVideoFiles(i)]; 
     end
 end
 
-fprintf('Starte parallele Batch-Auswertung für %d Messvideos...\n', length(videoFiles));
-resultsCell = cell(length(videoFiles), 1);
-statsCell = cell(length(videoFiles), 1);
+% -------------------------------------------------------------------------
+% 4. PARALLELE HAUPTSCHLEIFE (parfor)
+% -------------------------------------------------------------------------
+numTotal = length(videoFiles);
+fprintf('Starte parallele Batch-Auswertung für %d Messvideos...\n', numTotal);
 
-%% 3. Parallele Hauptschleife (parfor)
+% Grafischen Ladebalken erstellen
+wb = waitbar(0, sprintf('Starte Auswertung von %d Videos...', numTotal), 'Name', 'Batch-Fortschritt');
 D = parallel.pool.DataQueue;
-afterEach(D, @(~) fprintf('.')); 
+
+% Diese Funktion wird jedes Mal aufgerufen, wenn ein Worker ein Video fertig hat
+afterEach(D, @(~) updateWaitbar(wb, numTotal)); 
+
+statsCell = cell(numTotal, 1);
 
 parfor vIdx = 1:length(videoFiles)
     videoFile = fullfile(videoFiles(vIdx).folder, videoFiles(vIdx).name);
+    
+    % Prüfen, zu welcher Kalibrier-Gruppe das Video gehört
     groupTok = regexp(videoFile, '(Pos_\d+_Kal_\d+)', 'tokens');
     if isempty(groupTok)
         continue;
     end
     groupName = groupTok{1}{1};
     
+    % Ordnernamen des Videos extrahieren (falls noch in einem "200fps" Ordner, gehe eine Ebene höher)
     folders = strsplit(videoFiles(vIdx).folder, filesep);
-    paramFolder = folders{end-1};
-    
-    paramTokens = regexp(paramFolder, '(?<gas>[\d,]+)_(?<liq>[\d,]+)_Pos_(?<pos>\d+)', 'names');
-    if isempty(paramTokens)
-        vGasStr = "NaN"; vLiqStr = "NaN"; posNum = NaN; 
+    if contains(folders{end}, 'fps', 'IgnoreCase', true)
+        folderName = folders{end-1}; 
     else
-        vGasStr = string(paramTokens.gas);
-        vLiqStr = string(paramTokens.liq);
-        posNum = str2double(paramTokens.pos);
+        folderName = folders{end}; 
     end
-
+    
+    % Ordnernamen zerlegen mit Regex: 0.1_0.1_Pos_1_Q_1000_Glas_600
+    paramTokens = regexp(folderName, '(?<gas>[\d\.]+)_(?<liq>[\d\.]+)_Pos_(?<pos>\d+)_(?<form>[A-Za-z]+)_(?<kanal>\d+)_(?<mat>[A-Za-z]+)_(?<nadel>\d+)', 'names');
+    
+    % Fallback Variablen, falls der Ordnername nicht dem Schema entspricht
+    vGasStr = "NaN"; vLiqStr = "NaN"; posNum = NaN; 
+    formStr = "NaN"; kanalStr = "NaN"; matStr = "NaN"; nadelStr = "NaN";
+    
+    if ~isempty(paramTokens)
+        vGasStr   = string(paramTokens.gas);
+        vLiqStr   = string(paramTokens.liq);
+        posNum    = str2double(paramTokens.pos);
+        formStr   = string(paramTokens.form);
+        kanalStr  = string(paramTokens.kanal);
+        matStr    = string(paramTokens.mat);
+        nadelStr  = string(paramTokens.nadel);
+    end
+    
+    % --- LABORBUCH ABFRAGEN ---
+    labMatchIdx = find(strcmp(string(labTable.Dateiname), folderName));
+    
+    % 1. Fehler: Ordner existiert gar nicht im Laborbuch
+    if isempty(labMatchIdx)
+        warning('ÜBERSPRUNGEN: Ordner "%s" wurde im Laborbuch (Spalte "Dateiname") nicht gefunden!', folderName);
+        continue; % Bricht die Auswertung dieses Videos ab und geht zum nächsten
+    end
+    
+    p_Pa       = labTable.Umgebungsdruck(labMatchIdx(1));
+    temp_C     = labTable.Umgebungstemperatur(labMatchIdx(1));
+    co2_anteil = labTable.("CO2-Anteil")(labMatchIdx(1));
+    
+    % 2. Fehler: Einzelne Zellen im Laborbuch sind leer (NaN)
+    if ismissing(p_Pa) || isnan(p_Pa)
+        warning('ÜBERSPRUNGEN: Im Laborbuch fehlt der "Umgebungsdruck" für den Ordner "%s"!', folderName);
+        continue;
+    end
+    
+    if ismissing(temp_C) || isnan(temp_C)
+        warning('ÜBERSPRUNGEN: Im Laborbuch fehlt die "Umgebungstemperatur" für den Ordner "%s"!', folderName);
+        continue;
+    end
+    
+    if ismissing(co2_anteil) || isnan(co2_anteil)
+        warning('ÜBERSPRUNGEN: Im Laborbuch fehlt der "CO2-Anteil" für den Ordner "%s"!', folderName);
+        continue;
+    end
+    
+    % --- SETUP KONFIGURATION ABFRAGEN (Offsets & Länge) ---
+    setupMatchIdx = find(...
+        strcmp(string(setupTable.Material), matStr) & ...
+        strcmp(string(setupTable.Form), formStr) & ...
+        setupTable.Kanal_um == str2double(kanalStr) & ...
+        setupTable.Nadel_um == str2double(nadelStr));
+    
+    % 3. Fehler: Hardware-Setup existiert nicht in der Konfigurations-Datei
+    if isempty(setupMatchIdx)
+        warning('ÜBERSPRUNGEN: Kein Eintrag in Setup_Konfiguration.csv für: %s, %s, %sum Kanal, %sum Nadel!', ...
+                 matStr, formStr, kanalStr, nadelStr);
+        continue;
+    end
+    
+    reaktor_L = setupTable.Kanallaenge_cm(setupMatchIdx(1));
+    
+    % 4. Fehler: Kanal-Offsets für die Position auslesen
+    if posNum == 1
+        kanalStart_mm = setupTable.Pos_1_mm(setupMatchIdx(1));
+    elseif posNum == 2
+        kanalStart_mm = setupTable.Pos_2_mm(setupMatchIdx(1));
+    elseif posNum == 3
+        kanalStart_mm = setupTable.Pos_3_mm(setupMatchIdx(1));
+    else
+        warning('ÜBERSPRUNGEN: Unbekannte Kameraposition (Pos %d) beim Ordner "%s"!', posNum, folderName);
+        continue;
+    end
+    
+    % 5. Fehler: Prüfen, ob der Offset in der Setup-Datei vielleicht leer gelassen wurde
+    if ismissing(kanalStart_mm) || isnan(kanalStart_mm)
+        warning('ÜBERSPRUNGEN: In Setup_Konfiguration.csv fehlt der Offset-Wert für Position %d!', posNum);
+        continue;
+    end    
+    % Parameter für diesen parfor-Thread lokal speichern
     localParams = params;
     localParams.videoFile = videoFile;
+    localParams.kanalStart_mm = kanalStart_mm;
     
     try
         v = VideoReader(localParams.videoFile);
@@ -112,17 +224,7 @@ parfor vIdx = 1:length(videoFiles)
             error('Keine Kalibrierung vorhanden.');
         end
         
-        % Absolute Position berechnen
-        if posNum == 1
-            localParams.kanalStart_mm = 0;
-        elseif posNum == 2
-            localParams.kanalStart_mm = 181.5 * 1.05;
-        elseif posNum == 3
-            localParams.kanalStart_mm = 415.5 * 1.05;
-        else
-            localParams.kanalStart_mm = 0;
-        end
-        
+        % Bildbereich definieren
         imgH = v.Height; imgW = v.Width;
         roi = struct('y0', 1, 'y1', imgH, 'x0', 1, 'x1', imgW);
         
@@ -132,59 +234,129 @@ parfor vIdx = 1:length(videoFiles)
         channelHeightEstimate = NaN; 
         frameIdx = 0;
         
+        % Videobilder einzeln durchgehen
         while hasFrame(v)
             frameIdx = frameIdx + 1;
             I_full = readFrame(v);
             if ndims(I_full) == 3, I_full = rgb2gray(I_full); end
             I_roi = I_full(roi.y0:roi.y1, roi.x0:roi.x1);
             
-            % HIER GEÄNDERT: detect_Bubbles liefert nun 5-spaltige Centroids (inkl UC)
+            % Blasen detektieren
             [currentBubbleCentroids, channelHeightEstimate, ~, ~] = ...
                 detect_Bubbles(I_roi, channelHeightEstimate, localParams);
             
+            % Blasen tracken
             [bubbleTracker, prevBubbleCentroids, nextBubbleID] = track_Bubbles(...
                 currentBubbleCentroids, prevBubbleCentroids, bubbleTracker, nextBubbleID, frameIdx, localParams.maxJumpDist_px);
         end
         
         imgW = roi.x1 - roi.x0 + 1; 
-        mean_UC_mm = NaN; % Wird im neuen evaluate_Physics nicht mehr global benötigt!
+        mean_UC_mm = NaN; 
         
-        % HIER GEÄNDERT: evaluate_Physics rechnet nun Blasen- & Sluglängen!
-        [resultsTable, statsTable] = evaluate_Physics(bubbleTracker, px2mm, localParams.fps, ...
+        % Physik berechnen (Geschwindigkeiten, Längen)
+        [~, statsTable] = evaluate_Physics(bubbleTracker, px2mm, localParams.fps, ...
             localParams.minFramesTracked, imgW, localParams.kanalStart_mm, localParams.binSize_mm, mean_UC_mm);
         
-        % Metadaten anhängen (NUR Gas, Liq, Pos -> P und T macht Python!)
+        % --- METADATEN ZUR TABELLE HINZUFÜGEN ---
         numRowsStats = height(statsTable);
         if numRowsStats > 0
-            MetaDataStats = table(repmat(vGasStr, numRowsStats, 1), repmat(vLiqStr, numRowsStats, 1), ...
-                             repmat(posNum, numRowsStats, 1), ...
-                             'VariableNames', {'GasVelocity', 'LiquidVelocity', 'CameraPosition'});
+            % Eine Tabelle mit den neu ausgelesenen Konstanten erstellen
+            MetaDataStats = table(...
+                repmat(vGasStr, numRowsStats, 1), ...
+                repmat(vLiqStr, numRowsStats, 1), ...
+                repmat(posNum, numRowsStats, 1), ...
+                repmat(matStr, numRowsStats, 1), ...
+                repmat(formStr, numRowsStats, 1), ...
+                repmat(str2double(kanalStr), numRowsStats, 1), ...
+                repmat(str2double(nadelStr), numRowsStats, 1), ...
+                repmat(reaktor_L, numRowsStats, 1), ...
+                repmat(p_Pa, numRowsStats, 1), ...
+                repmat(temp_C, numRowsStats, 1), ...
+                repmat(co2_anteil, numRowsStats, 1), ...
+                'VariableNames', {'GasVelocity', 'LiquidVelocity', 'CameraPosition', ...
+                                  'Material', 'Geometrie', 'Kanal_um', 'Nadel_um', ...
+                                  'Reaktor_cm', 'Druck_Pa_Auslass', 'Temperatur_C', 'CO2_Anteil'});
+            
+            % Beide Tabellen (Metadaten + Physik-Daten) horizontal zusammenfügen
             statsTable = [MetaDataStats, statsTable];
             statsTable.Properties.RowNames = {};
         end
         
+        % In Cell-Array ablegen für Zusammenfassung nach der parfor-Schleife
         statsCell{vIdx} = statsTable;
         
     catch ME
-        warning('Fehler bei Video %d: %s', vIdx, ME.message);
+        warning('Fehler bei Video %d (%s): %s', vIdx, folderName, ME.message);
     end
-    send(D, vIdx); 
+    send(D, 1);
 end
-fprintf('\n');
 
-%% 4. Ergebnisse zusammenfassen und speichern
+try close(wb); catch; end 
+fprintf('\nAuswertung aller Videos abgeschlossen!\n');
+
+% -------------------------------------------------------------------------
+% 5. ERGEBNISSE ZUSAMMENFASSEN & AUTOMATISCH BENENNEN
+% -------------------------------------------------------------------------
 validStatsIdx = cellfun(@(x) ~isempty(x) && istable(x) && height(x) > 0, statsCell);
 statsCell = statsCell(validStatsIdx);
 
 if ~isempty(statsCell)
+    % Alle einzelnen Video-Tabellen untereinanderhängen
     MasterTableStats = vertcat(statsCell{:});
-    writetable(MasterTableStats, fullfile(baseDir, 'Gesamtauswertung_Statistik.csv'), 'Delimiter', ';');
-    fprintf('Gesamte Statistik gespeichert in Gesamtauswertung_Statistik.csv\n');
     
-    % HIER GEÄNDERT: Neue Plotfunktion aufrufen
+    % --- DYNAMISCHEN DATEINAMEN GENERIEREN ---
+    % Wir ziehen die Konstanten aus der allerersten Zeile der MasterTable
+    % Wichtig: Da Material und Geometrie Strings sind, greifen wir mit (1) darauf zu!
+    outMat   = MasterTableStats.Material(1);
+    outForm  = MasterTableStats.Geometrie(1);
+    outKanal = num2str(MasterTableStats.Kanal_um(1));
+    outLen   = num2str(MasterTableStats.Reaktor_cm(1));
+    outNadel = num2str(MasterTableStats.Nadel_um(1));
+    % CO2 Anteil umrechnen (0.2 -> "20molCO2")
+    outCO2   = num2str(MasterTableStats.CO2_Anteil(1) * 100); 
+    
+    % Dateiname bauen: z.B. Auswertung_Glas_Q_1000um_72cm_20molCO2_600um.csv
+    fileName = sprintf('Auswertung_%s_%s_%sum_%scm_%smolCO2_%sum.csv', ...
+                        outMat, outForm, outKanal, outLen, outCO2, outNadel);
+    
+    savePath = fullfile(baseDir, fileName);
+    
+    % Speichern
+    writetable(MasterTableStats, savePath, 'Delimiter', ';');
+    fprintf('ERFOLG: Gesamte Auswertung inkl. Metadaten gespeichert in:\n%s\n', fileName);
+    
+    % Plots generieren (falls gewollt)
     plotsDir = fullfile(baseDir, 'Geschwindigkeits_Plots');
-    generate_Batch_Plots(table(), MasterTableStats, plotsDir);
-    fprintf('Batch-Auswertung erfolgreich beendet.\n');
+    % generate_Batch_Plots(table(), MasterTableStats, plotsDir);
+    
 else
     fprintf('Keine validen Daten zur Speicherung gefunden.\n');
+end
+
+% =========================================================================
+% LOKALE FUNKTIONEN
+% =========================================================================
+function updateWaitbar(wb, numTotal)
+    % persistent speichert den Wert zwischen den Aufrufen der Funktion
+    persistent count
+    if isempty(count)
+        count = 1;
+    else
+        count = count + 1;
+    end
+    
+    % Prozentzahl berechnen
+    pct = count / numTotal;
+    
+    % Ladebalken aktualisieren (falls das Fenster nicht vom Nutzer geschlossen wurde)
+    try
+        waitbar(pct, wb, sprintf('Auswertung läuft... %.1f%% (%d von %d)', pct*100, count, numTotal));
+    catch
+        % Fenster wurde manuell geschlossen, Fehler ignorieren
+    end
+    
+    % Zähler für den nächsten Batch-Run zurücksetzen, wenn wir fertig sind
+    if count == numTotal
+        clear count; 
+    end
 end
