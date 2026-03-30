@@ -3,8 +3,8 @@ clc; close all; clear;
 
 %% 1. Parameter & Konfiguration
 % Wichtig: Die Pfade und FPS muessen an das jeweilige Video angepasst werden
-params.videoFile = 'Test\0,19_0,194_Pos_1.avi';
-params.calibFile = 'Test\Kalibrierung_1_Pos_1.avi';
+params.videoFile = 'PVC_1000_600\Auswertung_20_CO2\Auswertung_20_CO2\Pos_3_Kal_1\0.122_0.056_Pos_3_R_1000_PVC_600\200fps_001\XSM-3520 Camera 0330_.avi';
+params.calibFile = 'PVC_1000_600\Auswertung_20_CO2\Auswertung_20_CO2\Pos_3_Kal_1\Kalibrierung_1_Pos_3_23.03.2026\XSM-3520 Camera 0330_.avi';
 params.fps = 200; % Entsprechend der Kamera-Einstellung (z.B. 200 oder 500)
 
 % Visualisierung und Kontrolle
@@ -16,11 +16,11 @@ params.dimOffsetY            = 45;    % Y-Offset fuer die Masslinien in der Visu
 % Geometrie- und Bildfilter fuer Fluessigkeits-Slugs
 params.minPixel     = 50;   % Minimum an Pixeln fuer ein Objekt
 params.minArea      = 100;  % Minimum-Flaeche
-params.minSolid     = 0.50; % Kompaktheit (Solidity)
-params.maxSolid     = 0.94;
+params.minSolid     = 0.00; % Kompaktheit (Solidity)
+params.maxSolid     = 1;
 params.minEcc       = 0.05; % Exzentrizitaet (Abweichung von der Kreisform)
 params.minAngle     = 0;    % Mindestwinkel
-params.toleranceY   = 0.2;  % Toleranzband in der Mitte der Blase fuer die Kantenfindung
+params.toleranceY   = 0.1;  % Toleranzband in der Mitte der Blase fuer die Kantenfindung
 params.borderMargin = 2;    % Pixelabstand vom Bildrand, bei dem Blasen ignoriert werden
 
 % Tracking Parameter
@@ -33,11 +33,11 @@ params.binSize_mm    = 4; % Rastergroesse fuer die Fehlerbalken-Statistik
 
 % PARAMETER FÜR BLASEN-FÜLLUNG (Möglichkeit 2) ---
 params.closeWidth = 3;          % Breite des Schließ-Werkzeugs in Pixeln
-params.closeHeight = 3;         % NEU: Höhe des Schließ-Werkzeugs (vertikal) zum Füllen vertikaler Lücken
+params.closeHeight = 7;         % NEU: Höhe des Schließ-Werkzeugs (vertikal) zum Füllen vertikaler Lücken
 params.showBinarySteps = true;   % Zeigt das Binärbild vor und nach dem Schließen
 
 % --- ADAPTIVE SCHWELLENWERT-PARAMETER ---
-params.sens = 0.7;              % Sensitivität (0 bis 1, höher = mehr Weiß)
+params.sens = 0.85;              % Sensitivität (0 bis 1, höher = mehr Weiß)
 params.neighborhoodSize = 51;    % NEU: Fenstergröße für lokalen Kontrast (MUSS ungerade sein!)
 %% 2. Video initialisieren & Kalibrierung
 v_calib = VideoReader(params.calibFile);

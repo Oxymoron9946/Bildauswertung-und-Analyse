@@ -5,18 +5,20 @@ clc; close all; clear;
 % 0. PFADE ZU DEN METADATEN-DATEIEN (HIER ANPASSEN!)
 % -------------------------------------------------------------------------
 % Fester Pfad zu deinem aus Excel exportierten Laborbuch
-laborbuchPath = 'C:\Pfad\zu\deinem\Laborbuch.csv'; 
-
-% Pfad zur Setup-Konfiguration (liegt am besten im selben Ordner wie das Skript)
-setupPath = fullfile(pwd, 'Setup_Konfiguration.csv'); 
+laborbuchPath = 'Laborbuch.csv'; 
 
 % -------------------------------------------------------------------------
 % 1. PARAMETER & KONFIGURATION
 % -------------------------------------------------------------------------
 % Filter für Flüssigkeits-Slugs / Blasen (Rauschen filtern)
-params.minPixel = 50;        % Mindestanzahl an Pixeln, damit etwas als Blase zählt
-params.minArea = 100;        % Mindestfläche in Pixeln
-params.toleranceY = 0.1;     % Toleranz für Abweichungen in der Y-Achse (verhindert Tracking von Artefakten am Rand)
+params.minPixel = 50;    % Mindestanzahl an Pixeln, damit etwas als Blase zählt
+params.minArea = 100;    % Mindestfläche in Pixeln
+params.minSolid = 0.0;  % Minimale Kompaktheit (verhindert stark zerfranste Rauscheffekte)
+params.maxSolid = 1;  % Maximale Kompaktheit (filtert perfekte Rechtecke/Kameraränder aus)
+params.minEcc = 0.00;    % Minimale Exzentrizität (filtert perfekte Kreise, Slugs sind i.d.R. länglich)
+params.minAngle = 0;     % Minimaler Rotationswinkel (in Grad)
+params.toleranceY = 0.2; % Toleranz für Abweichungen in der Y-Achse
+params.borderMargin = 2; % Pixelabstand, den Objekte vom Bildrand halten müssen
 
 % Tracking Parameter
 params.maxJumpDist_px = 50;  % Maximale Pixel, die sich eine Blase zwischen zwei Frames bewegen darf
@@ -28,7 +30,7 @@ params.fps = 200;            % Standard Framerate (falls nicht auslesbar)
 
 % Wichtige Tuning-Parameter für die Bildverarbeitung (Morphologische Operationen)
 params.closeWidth = 3;       % Schließt Risse in der Blase in X-Richtung
-params.closeHeight = 5;      % Schließt Risse in der Blase in Y-Richtung
+params.closeHeight = 7;      % Schließt Risse in der Blase in Y-Richtung
 params.sens = 0.85;          % Sensitivität für den Adaptive Threshold (0-1). Höher = sensitiver für dunkle Ränder.
 
 % -------------------------------------------------------------------------
@@ -43,12 +45,6 @@ end
 labTable = readtable(laborbuchPath, 'Delimiter', ';', 'VariableNamingRule', 'preserve');
 fprintf('Laborbuch geladen: %d Einträge gefunden.\n', height(labTable));
 
-% Lese Setup-Konfiguration ein
-if ~isfile(setupPath)
-    error('Setup-Konfiguration nicht gefunden unter: %s', setupPath);
-end
-setupTable = readtable(setupPath, 'Delimiter', ';', 'VariableNamingRule', 'preserve');
-fprintf('Setup-Konfiguration geladen: %d Hardware-Setups gefunden.\n', height(setupTable));
 fprintf('----------------------------------\n\n');
 
 % -------------------------------------------------------------------------
@@ -131,12 +127,13 @@ parfor vIdx = 1:length(videoFiles)
     end
     
     % Ordnernamen zerlegen mit Regex: 0.1_0.1_Pos_1_Q_1000_Glas_600
-    paramTokens = regexp(folderName, '(?<gas>[\d\.]+)_(?<liq>[\d\.]+)_Pos_(?<pos>\d+)_(?<form>[A-Za-z]+)_(?<kanal>\d+)_(?<mat>[A-Za-z]+)_(?<nadel>\d+)', 'names');
+    paramTokens = regexp(folderName, '(?<gas>[\d\.]+)_(?<liq>[\d\.]+)_Pos_(?<pos>\d+)_(?<form>[A-Za-z]+)_(?<kanal>\d+)_(?<mat>[A-Za-z]+)_(?<nadel>\d+)', 'names');  
     
     % Fallback Variablen, falls der Ordnername nicht dem Schema entspricht
     vGasStr = "NaN"; vLiqStr = "NaN"; posNum = NaN; 
     formStr = "NaN"; kanalStr = "NaN"; matStr = "NaN"; nadelStr = "NaN";
-    
+    isDruckMessung = contains(folderName, 'Druck', 'IgnoreCase', true);
+
     if ~isempty(paramTokens)
         vGasStr   = string(paramTokens.gas);
         vLiqStr   = string(paramTokens.liq);
@@ -159,6 +156,8 @@ parfor vIdx = 1:length(videoFiles)
     p_Pa       = labTable.Umgebungsdruck(labMatchIdx(1));
     temp_C     = labTable.Umgebungstemperatur(labMatchIdx(1));
     co2_anteil = labTable.("CO2-Anteil")(labMatchIdx(1));
+    reaktor_L     = labTable.Kanallaenge(labMatchIdx(1));
+    kanalStart_mm = labTable.Offset(labMatchIdx(1));
     
     % 2. Fehler: Einzelne Zellen im Laborbuch sind leer (NaN)
     if ismissing(p_Pa) || isnan(p_Pa)
@@ -175,40 +174,17 @@ parfor vIdx = 1:length(videoFiles)
         warning('ÜBERSPRUNGEN: Im Laborbuch fehlt der "CO2-Anteil" für den Ordner "%s"!', folderName);
         continue;
     end
-    
-    % --- SETUP KONFIGURATION ABFRAGEN (Offsets & Länge) ---
-    setupMatchIdx = find(...
-        strcmp(string(setupTable.Material), matStr) & ...
-        strcmp(string(setupTable.Form), formStr) & ...
-        setupTable.Kanal_um == str2double(kanalStr) & ...
-        setupTable.Nadel_um == str2double(nadelStr));
-    
-    % 3. Fehler: Hardware-Setup existiert nicht in der Konfigurations-Datei
-    if isempty(setupMatchIdx)
-        warning('ÜBERSPRUNGEN: Kein Eintrag in Setup_Konfiguration.csv für: %s, %s, %sum Kanal, %sum Nadel!', ...
-                 matStr, formStr, kanalStr, nadelStr);
-        continue;
+       
+    if ismissing(reaktor_L) || isnan(reaktor_L)
+        warning('ÜBERSPRUNGEN: Im Laborbuch fehlt "Kanallaenge_cm" für Ordner "%s"!', folderName); 
+        continue; 
     end
     
-    reaktor_L = setupTable.Kanallaenge_cm(setupMatchIdx(1));
-    
-    % 4. Fehler: Kanal-Offsets für die Position auslesen
-    if posNum == 1
-        kanalStart_mm = setupTable.Pos_1_mm(setupMatchIdx(1));
-    elseif posNum == 2
-        kanalStart_mm = setupTable.Pos_2_mm(setupMatchIdx(1));
-    elseif posNum == 3
-        kanalStart_mm = setupTable.Pos_3_mm(setupMatchIdx(1));
-    else
-        warning('ÜBERSPRUNGEN: Unbekannte Kameraposition (Pos %d) beim Ordner "%s"!', posNum, folderName);
-        continue;
-    end
-    
-    % 5. Fehler: Prüfen, ob der Offset in der Setup-Datei vielleicht leer gelassen wurde
     if ismissing(kanalStart_mm) || isnan(kanalStart_mm)
-        warning('ÜBERSPRUNGEN: In Setup_Konfiguration.csv fehlt der Offset-Wert für Position %d!', posNum);
-        continue;
-    end    
+        warning('ÜBERSPRUNGEN: Im Laborbuch fehlt "Offset_mm" für Ordner "%s"!', folderName); 
+        continue; 
+    end
+
     % Parameter für diesen parfor-Thread lokal speichern
     localParams = params;
     localParams.videoFile = videoFile;
@@ -260,6 +236,11 @@ parfor vIdx = 1:length(videoFiles)
         % --- METADATEN ZUR TABELLE HINZUFÜGEN ---
         numRowsStats = height(statsTable);
         if numRowsStats > 0
+            if isDruckMessung
+                messartStr = "Druckkalibrierung";
+            else
+                messartStr = "Massentransfer";
+            end
             % Eine Tabelle mit den neu ausgelesenen Konstanten erstellen
             MetaDataStats = table(...
                 repmat(vGasStr, numRowsStats, 1), ...
@@ -273,9 +254,10 @@ parfor vIdx = 1:length(videoFiles)
                 repmat(p_Pa, numRowsStats, 1), ...
                 repmat(temp_C, numRowsStats, 1), ...
                 repmat(co2_anteil, numRowsStats, 1), ...
+                repmat(messartStr, numRowsStats, 1), ...
                 'VariableNames', {'GasVelocity', 'LiquidVelocity', 'CameraPosition', ...
                                   'Material', 'Geometrie', 'Kanal_um', 'Nadel_um', ...
-                                  'Reaktor_cm', 'Druck_Pa_Auslass', 'Temperatur_C', 'CO2_Anteil'});
+                                  'Reaktor_cm', 'Druck_Pa_Auslass', 'Temperatur_C', 'CO2_Anteil', 'Messart'});
             
             % Beide Tabellen (Metadaten + Physik-Daten) horizontal zusammenfügen
             statsTable = [MetaDataStats, statsTable];
@@ -304,29 +286,51 @@ if ~isempty(statsCell)
     % Alle einzelnen Video-Tabellen untereinanderhängen
     MasterTableStats = vertcat(statsCell{:});
     
-    % --- DYNAMISCHEN DATEINAMEN GENERIEREN ---
-    % Wir ziehen die Konstanten aus der allerersten Zeile der MasterTable
-    % Wichtig: Da Material und Geometrie Strings sind, greifen wir mit (1) darauf zu!
-    outMat   = MasterTableStats.Material(1);
-    outForm  = MasterTableStats.Geometrie(1);
-    outKanal = num2str(MasterTableStats.Kanal_um(1));
-    outLen   = num2str(MasterTableStats.Reaktor_cm(1));
-    outNadel = num2str(MasterTableStats.Nadel_um(1));
-    % CO2 Anteil umrechnen (0.2 -> "20molCO2")
-    outCO2   = num2str(MasterTableStats.CO2_Anteil(1) * 100); 
+    % Finde alle einzigartigen Messarten in der Gesamttabelle (z.B. "Massentransfer" und "Druckkalibrierung")
+    messarten = unique(MasterTableStats.Messart);
     
-    % Dateiname bauen: z.B. Auswertung_Glas_Q_1000um_72cm_20molCO2_600um.csv
-    fileName = sprintf('Auswertung_%s_%s_%sum_%scm_%smolCO2_%sum.csv', ...
-                        outMat, outForm, outKanal, outLen, outCO2, outNadel);
-    
-    savePath = fullfile(baseDir, fileName);
-    
-    % Speichern
-    writetable(MasterTableStats, savePath, 'Delimiter', ';');
-    fprintf('ERFOLG: Gesamte Auswertung inkl. Metadaten gespeichert in:\n%s\n', fileName);
+    % Schleife über die gefundenen Messarten, um sie getrennt zu speichern
+    for m = 1:length(messarten)
+        aktuelleMessart = string(messarten(m));
+        
+        % Filtere die große Tabelle nach der aktuellen Messart
+        teilTabelle = MasterTableStats(string(MasterTableStats.Messart) == aktuelleMessart, :);
+        
+        % Dynamischen Dateinamen anhand der ersten Zeile dieser TEIL-Tabelle generieren
+        outMat   = teilTabelle.Material(1);
+        outForm  = teilTabelle.Geometrie(1);
+        outKanal = num2str(teilTabelle.Kanal_um(1));
+        outLen   = num2str(teilTabelle.Reaktor_cm(1));
+        outNadel = num2str(teilTabelle.Nadel_um(1));
+        outCO2   = num2str(teilTabelle.CO2_Anteil(1) * 100); 
+        
+        % Ordner und Prefix basierend auf der aktuellen Messart festlegen
+        if aktuelleMessart == "Druckkalibrierung"
+            outFolder = fullfile(pwd, 'Ausgabe_Druckkalibrierung');
+            prefix = 'Auswertung_Druck';
+        else
+            outFolder = fullfile(pwd, 'Ausgabe_Massentransfer');
+            prefix = 'Auswertung_Masse';
+        end
+        
+        % Ordner erstellen, falls er noch nicht existiert
+        if ~exist(outFolder, 'dir')
+            mkdir(outFolder);
+        end
+        
+        % Dateiname bauen
+        fileName = sprintf('%s_%s_%s_%sum_%scm_%smolCO2_%sum.csv', ...
+                            prefix, outMat, outForm, outKanal, outLen, outCO2, outNadel);
+        
+        savePath = fullfile(outFolder, fileName);
+        
+        % Speichern
+        writetable(teilTabelle, savePath, 'Delimiter', ';');
+        fprintf('ERFOLG: %d Zeilen gespeichert in Ordner:\n%s\nDateiname: %s\n', height(teilTabelle), outFolder, fileName);
+    end
     
     % Plots generieren (falls gewollt)
-    plotsDir = fullfile(baseDir, 'Geschwindigkeits_Plots');
+    % plotsDir = fullfile(baseDir, 'Geschwindigkeits_Plots');
     % generate_Batch_Plots(table(), MasterTableStats, plotsDir);
     
 else

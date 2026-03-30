@@ -32,14 +32,11 @@ function [currentBubbleCentroids, channelHeightEstimate, det, currentUC_px, B_be
     % Sensitivität abfragen (Standard: 0.5, falls im Hauptskript nicht definiert)
     if isfield(params, 'sens'), s = params.sens; else, s = 0.5; end
     
-    % Adaptive Thresholding: Berechnet für jeden Pixel einen eigenen Schwellenwert
-    % basierend auf seiner Umgebung (Neighborhood).
-    if isfield(params, 'neighborhoodSize')
-        nbSize = floor(size(I_eq, 1) / 2);
-        if mod(nbSize, 2) == 0, nbSize = nbSize - 1; end % Muss ungerade sein
-    else
-        % Fallback: Standardmäßig ca. 1/8 der Bildhöhe (und auf ungerade Zahl gezwungen)
-        nbSize = 2 * floor(size(I_eq,1)/16) + 1; 
+    % Adaptive Thresholding: Neighborhood immer auf halbe Bildhöhe setzen
+    nbSize = floor(size(I_eq, 1) / 2);
+    % MATLAB verlangt für adaptthresh zwingend ungerade Zahlen
+    if mod(nbSize, 2) == 0
+        nbSize = nbSize - 1; 
     end
     
     % Erstelle die lokale Schwellenwert-Matrix
@@ -79,13 +76,25 @@ function [currentBubbleCentroids, channelHeightEstimate, det, currentUC_px, B_be
         return; 
     end
     
-    % Einfache Merkmale (Fläche und die umschließende Box) für alle Objekte berechnen
-    statsBasic = regionprops(L, 'Area', 'BoundingBox');
+    % Einfache Merkmale (Fläche, BoundingBox und Formfaktoren) für alle Objekte berechnen
+    statsBasic = regionprops(L, 'Area', 'BoundingBox', 'Solidity', 'Eccentricity', 'Orientation');
     
-    % Nur Objekte betrachten, die groß genug sind (minArea)
-    candidateIdx = find([statsBasic.Area] > params.minArea);
+    % Fallbacks für die Form-Filter definieren (sorgt für Fehlerfreiheit, falls
+    % das Skript mal ohne eine aktualisierte main_Batch aufgerufen wird)
+    if ~isfield(params, 'minSolid'), params.minSolid = 0.0; end
+    if ~isfield(params, 'maxSolid'), params.maxSolid = 1.0; end
+    if ~isfield(params, 'minEcc'),   params.minEcc = 0.0; end
+    if ~isfield(params, 'minAngle'), params.minAngle = 0.0; end
+    
+    % Filtern: Nur Objekte betrachten, die groß genug sind UND alle Form-Kriterien erfüllen
+    candidateIdx = find([statsBasic.Area] > params.minArea & ...
+                        [statsBasic.Solidity] >= params.minSolid & ...
+                        [statsBasic.Solidity] <= params.maxSolid & ...
+                        [statsBasic.Eccentricity] >= params.minEcc & ...
+                        abs([statsBasic.Orientation]) >= params.minAngle);
+    
     if isempty(candidateIdx)
-        return; 
+        return;
     end
     
     %% 4. Dynamische Bestimmung der Kanalhöhe
