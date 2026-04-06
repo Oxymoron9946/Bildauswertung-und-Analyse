@@ -3,8 +3,8 @@ clc; close all; clear;
 
 %% 1. Parameter & Konfiguration
 % Wichtig: Die Pfade und FPS muessen an das jeweilige Video angepasst werden
-params.videoFile = 'PVC_1000_600\Auswertung_20_CO2\Auswertung_20_CO2\Pos_3_Kal_1\0.122_0.056_Pos_3_R_1000_PVC_600\200fps_001\XSM-3520 Camera 0330_.avi';
-params.calibFile = 'PVC_1000_600\Auswertung_20_CO2\Auswertung_20_CO2\Pos_3_Kal_1\Kalibrierung_1_Pos_3_23.03.2026\XSM-3520 Camera 0330_.avi';
+params.videoFile = 'PVC_1mm_800um\Auswertung_20_CO2\Pos_1_Kal_1\0.134_0.25_Pos_1_R_1000_PVC_800\200fps_001\XSM-3520 Camera 0330_.avi';
+params.calibFile = 'PVC_1mm_800um\Auswertung_20_CO2\Pos_1_Kal_1\Kalibrierung_1_Pos_1_26.03.2026_002\XSM-3520 Camera 0330_.avi';
 params.fps = 200; % Entsprechend der Kamera-Einstellung (z.B. 200 oder 500)
 
 % Visualisierung und Kontrolle
@@ -18,9 +18,9 @@ params.minPixel     = 50;   % Minimum an Pixeln fuer ein Objekt
 params.minArea      = 100;  % Minimum-Flaeche
 params.minSolid     = 0.00; % Kompaktheit (Solidity)
 params.maxSolid     = 1;
-params.minEcc       = 0.05; % Exzentrizitaet (Abweichung von der Kreisform)
+params.minEcc       = 0.00; % Exzentrizitaet (Abweichung von der Kreisform)
 params.minAngle     = 0;    % Mindestwinkel
-params.toleranceY   = 0.1;  % Toleranzband in der Mitte der Blase fuer die Kantenfindung
+params.toleranceY   = 0.2;  % Toleranzband in der Mitte der Blase fuer die Kantenfindung
 params.borderMargin = 2;    % Pixelabstand vom Bildrand, bei dem Blasen ignoriert werden
 
 % Tracking Parameter
@@ -37,7 +37,7 @@ params.closeHeight = 7;         % NEU: Höhe des Schließ-Werkzeugs (vertikal) z
 params.showBinarySteps = true;   % Zeigt das Binärbild vor und nach dem Schließen
 
 % --- ADAPTIVE SCHWELLENWERT-PARAMETER ---
-params.sens = 0.85;              % Sensitivität (0 bis 1, höher = mehr Weiß)
+params.sens = 0.75;              % Sensitivität (0 bis 1, höher = mehr Weiß)
 params.neighborhoodSize = 51;    % NEU: Fenstergröße für lokalen Kontrast (MUSS ungerade sein!)
 %% 2. Video initialisieren & Kalibrierung
 v_calib = VideoReader(params.calibFile);

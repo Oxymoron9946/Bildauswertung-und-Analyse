@@ -13,10 +13,6 @@ laborbuchPath = 'Laborbuch.csv';
 % Filter für Flüssigkeits-Slugs / Blasen (Rauschen filtern)
 params.minPixel = 50;    % Mindestanzahl an Pixeln, damit etwas als Blase zählt
 params.minArea = 100;    % Mindestfläche in Pixeln
-params.minSolid = 0.0;  % Minimale Kompaktheit (verhindert stark zerfranste Rauscheffekte)
-params.maxSolid = 1;  % Maximale Kompaktheit (filtert perfekte Rechtecke/Kameraränder aus)
-params.minEcc = 0.00;    % Minimale Exzentrizität (filtert perfekte Kreise, Slugs sind i.d.R. länglich)
-params.minAngle = 0;     % Minimaler Rotationswinkel (in Grad)
 params.toleranceY = 0.2; % Toleranz für Abweichungen in der Y-Achse
 params.borderMargin = 2; % Pixelabstand, den Objekte vom Bildrand halten müssen
 
@@ -31,7 +27,6 @@ params.fps = 200;            % Standard Framerate (falls nicht auslesbar)
 % Wichtige Tuning-Parameter für die Bildverarbeitung (Morphologische Operationen)
 params.closeWidth = 3;       % Schließt Risse in der Blase in X-Richtung
 params.closeHeight = 7;      % Schließt Risse in der Blase in Y-Richtung
-params.sens = 0.85;          % Sensitivität für den Adaptive Threshold (0-1). Höher = sensitiver für dunkle Ränder.
 
 % -------------------------------------------------------------------------
 % 2. TABELLEN EINLESEN (Laborbuch & Setup)
@@ -114,6 +109,7 @@ parfor vIdx = 1:length(videoFiles)
     % Prüfen, zu welcher Kalibrier-Gruppe das Video gehört
     groupTok = regexp(videoFile, '(Pos_\d+_Kal_\d+)', 'tokens');
     if isempty(groupTok)
+        warning('ÜBERSPRUNGEN: Video hat kein "Pos_X_Kal_Y" im Pfad: %s', videoFile);
         continue;
     end
     groupName = groupTok{1}{1};
@@ -190,48 +186,87 @@ parfor vIdx = 1:length(videoFiles)
     localParams.videoFile = videoFile;
     localParams.kanalStart_mm = kanalStart_mm;
     
-    try
-        v = VideoReader(localParams.videoFile);
-        v.CurrentTime = 0;
-        
+    try        
         if isKey(calibMap, groupName)
             px2mm = calibMap(groupName);
         else
-            error('Keine Kalibrierung vorhanden.');
+            error('Schlüssel "%s" existiert nicht in der calibMap!', groupName);
         end
+
+        sensToTest = [0.85, 0.75, 0.9, 0.95, 0.8, 0.7, 0.65]; 
         
-        % Bildbereich definieren
-        imgH = v.Height; imgW = v.Width;
-        roi = struct('y0', 1, 'y1', imgH, 'x0', 1, 'x1', imgW);
+        bestStatsTable = table(); 
+        bestSens = NaN;
+
         
-        bubbleTracker = []; 
-        nextBubbleID = 1;
-        prevBubbleCentroids = []; 
-        channelHeightEstimate = NaN; 
-        frameIdx = 0;
         
-        % Videobilder einzeln durchgehen
-        while hasFrame(v)
-            frameIdx = frameIdx + 1;
-            I_full = readFrame(v);
-            if ndims(I_full) == 3, I_full = rgb2gray(I_full); end
-            I_roi = I_full(roi.y0:roi.y1, roi.x0:roi.x1);
+        for sensIdx = 1:length(sensToTest)
+            % Aktuelle Sensitivität für diesen Durchlauf in die Parameter schreiben
+            localParams.sens = sensToTest(sensIdx);
             
-            % Blasen detektieren
-            [currentBubbleCentroids, channelHeightEstimate, ~, ~] = ...
-                detect_Bubbles(I_roi, channelHeightEstimate, localParams);
+            v = VideoReader(localParams.videoFile);
             
-            % Blasen tracken
-            [bubbleTracker, prevBubbleCentroids, nextBubbleID] = track_Bubbles(...
-                currentBubbleCentroids, prevBubbleCentroids, bubbleTracker, nextBubbleID, frameIdx, localParams.maxJumpDist_px);
+            % Bildbereich definieren
+            imgH = v.Height; imgW = v.Width;
+            roi = struct('y0', 1, 'y1', imgH, 'x0', 1, 'x1', imgW);
+
+            v.CurrentTime = 0;
+            bubbleTracker = []; 
+            nextBubbleID = 1;
+            prevBubbleCentroids = []; 
+            channelHeightEstimate = NaN; 
+            frameIdx = 0;
+        
+            % Videobilder einzeln durchgehen
+            while hasFrame(v)
+                frameIdx = frameIdx + 1;
+                I_full = readFrame(v);
+                if ndims(I_full) == 3, I_full = rgb2gray(I_full); end
+                I_roi = I_full(roi.y0:roi.y1, roi.x0:roi.x1);
+                
+                % Blasen detektieren
+                [currentBubbleCentroids, channelHeightEstimate, ~, ~] = ...
+                    detect_Bubbles(I_roi, channelHeightEstimate, localParams);
+                
+                % Blasen tracken
+                [bubbleTracker, prevBubbleCentroids, nextBubbleID] = track_Bubbles(...
+                    currentBubbleCentroids, prevBubbleCentroids, bubbleTracker, nextBubbleID, frameIdx, localParams.maxJumpDist_px);
+            end
+            
+            if ~isempty(bubbleTracker)
+                % Blase 1 filtern
+                if posNum == 1
+                    bubbleTracker = bubbleTracker([bubbleTracker.ID] ~= 1);
+                end
+            end
+
+            imgW = roi.x1 - roi.x0 + 1; 
+            mean_UC_mm = NaN; 
+            
+            % Physik berechnen (Geschwindigkeiten, Längen)
+            [~, statsTable] = evaluate_Physics(bubbleTracker, px2mm, localParams.fps, ...
+                localParams.minFramesTracked, imgW, localParams.kanalStart_mm, localParams.binSize_mm, mean_UC_mm);
+            
+            % Die Funktion prüft Länge, Geschwindigkeit und Blasenanzahl
+            isGood = evaluate_DetectionQuality(statsTable);
+            
+            if isGood
+                % Perfekt! Ergebnis speichern und die Sensitivitäts-Schleife abbrechen
+                bestStatsTable = statsTable;
+                bestSens = localParams.sens;
+                break; 
+            else
+                % Fallback: Wenn es das allererste Ergebnis ist (Standard-Sensitivität), 
+                % merken wir es uns, falls ALLE anderen Sensitivitäten auch scheitern.
+                if sensIdx == 1
+                    bestStatsTable = statsTable;
+                    bestSens = localParams.sens;
+                end
+            end
         end
-        
-        imgW = roi.x1 - roi.x0 + 1; 
-        mean_UC_mm = NaN; 
-        
-        % Physik berechnen (Geschwindigkeiten, Längen)
-        [~, statsTable] = evaluate_Physics(bubbleTracker, px2mm, localParams.fps, ...
-            localParams.minFramesTracked, imgW, localParams.kanalStart_mm, localParams.binSize_mm, mean_UC_mm);
+
+        statsTable = bestStatsTable;
+        bestSens = bestSens; % (Stellt sicher, dass die Variable im Workspace der Worker existiert)
         
         % --- METADATEN ZUR TABELLE HINZUFÜGEN ---
         numRowsStats = height(statsTable);
@@ -255,17 +290,18 @@ parfor vIdx = 1:length(videoFiles)
                 repmat(temp_C, numRowsStats, 1), ...
                 repmat(co2_anteil, numRowsStats, 1), ...
                 repmat(messartStr, numRowsStats, 1), ...
+                repmat(bestSens, numRowsStats, 1), ...
                 'VariableNames', {'GasVelocity', 'LiquidVelocity', 'CameraPosition', ...
                                   'Material', 'Geometrie', 'Kanal_um', 'Nadel_um', ...
-                                  'Reaktor_cm', 'Druck_Pa_Auslass', 'Temperatur_C', 'CO2_Anteil', 'Messart'});
+                                  'Reaktor_cm', 'Druck_Pa_Auslass', 'Temperatur_C', 'CO2_Anteil', 'Messart', 'UsedSensitivity'});
             
             % Beide Tabellen (Metadaten + Physik-Daten) horizontal zusammenfügen
             statsTable = [MetaDataStats, statsTable];
             statsTable.Properties.RowNames = {};
         end
-        
-        % In Cell-Array ablegen für Zusammenfassung nach der parfor-Schleife
-        statsCell{vIdx} = statsTable;
+    
+    % In Cell-Array ablegen für Zusammenfassung nach der parfor-Schleife
+    statsCell{vIdx} = statsTable;
         
     catch ME
         warning('Fehler bei Video %d (%s): %s', vIdx, folderName, ME.message);

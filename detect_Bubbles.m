@@ -81,17 +81,17 @@ function [currentBubbleCentroids, channelHeightEstimate, det, currentUC_px, B_be
     
     % Fallbacks für die Form-Filter definieren (sorgt für Fehlerfreiheit, falls
     % das Skript mal ohne eine aktualisierte main_Batch aufgerufen wird)
-    if ~isfield(params, 'minSolid'), params.minSolid = 0.0; end
-    if ~isfield(params, 'maxSolid'), params.maxSolid = 1.0; end
-    if ~isfield(params, 'minEcc'),   params.minEcc = 0.0; end
-    if ~isfield(params, 'minAngle'), params.minAngle = 0.0; end
+    % if ~isfield(params, 'minSolid'), params.minSolid = 0.0; end
+    % if ~isfield(params, 'maxSolid'), params.maxSolid = 1.0; end
+    % if ~isfield(params, 'minEcc'),   params.minEcc = 0.0; end
+    % if ~isfield(params, 'minAngle'), params.minAngle = 0.0; end
     
     % Filtern: Nur Objekte betrachten, die groß genug sind UND alle Form-Kriterien erfüllen
-    candidateIdx = find([statsBasic.Area] > params.minArea & ...
-                        [statsBasic.Solidity] >= params.minSolid & ...
-                        [statsBasic.Solidity] <= params.maxSolid & ...
-                        [statsBasic.Eccentricity] >= params.minEcc & ...
-                        abs([statsBasic.Orientation]) >= params.minAngle);
+    candidateIdx = find([statsBasic.Area] > params.minArea);
+                        % [statsBasic.Solidity] >= params.minSolid & ...
+                        % [statsBasic.Solidity] <= params.maxSolid & ...
+                        % [statsBasic.Eccentricity] >= params.minEcc & ...
+                        % abs([statsBasic.Orientation]) >= params.minAngle);
     
     if isempty(candidateIdx)
         return;
