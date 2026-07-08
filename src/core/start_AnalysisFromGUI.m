@@ -37,6 +37,23 @@ function start_AnalysisFromGUI(mode, config, targetPath)
         params.exportImages          = config.ui.exportImages;
         params.exportFrame           = config.ui.exportFrame;
 
+        % --- Offset aus dem Laborbuch auslesen (statt blindem Config-Fallback) ---
+        [videoFolder, ~, ~] = fileparts(videoFile);
+        folders = strsplit(videoFolder, filesep);
+        if contains(folders{end}, 'fps', 'IgnoreCase', true)
+            folderName = folders{end-1};
+        else
+            folderName = folders{end};
+        end
+        labTable = load_Laborbuch(config.paths.laborbuch);
+        labMatchIdx = find(strcmp(string(labTable.Dateiname), folderName));
+        if ~isempty(labMatchIdx) && ~ismissing(labTable.Offset(labMatchIdx(1))) && ~isnan(labTable.Offset(labMatchIdx(1)))
+            params.kanalStart_mm = labTable.Offset(labMatchIdx(1));
+            fprintf('Offset aus Laborbuch für "%s": %.1f mm.\n', folderName, params.kanalStart_mm);
+        else
+            fprintf('Kein Laborbuch-Eintrag für "%s" gefunden – nutze Config-Fallback (Offset = %.1f mm).\n', folderName, params.kanalStart_mm);
+        end
+
         allStats = cell(length(config.detection.sensArray), 1);
         lastResultsTable = [];  % Speichere die letzte resultsTable für die Visualisierung
 
@@ -69,7 +86,21 @@ function start_AnalysisFromGUI(mode, config, targetPath)
         validStatsIdx = cellfun(@(x) ~isempty(x), allStats);
         if any(validStatsIdx)
             MasterTable = vertcat(allStats{validStatsIdx});
-            outputFile = fullfile(projectRoot, 'output', 'GUI_Einzel_Ergebnis.csv');
+            
+            % Zielordner und Dateiname basierend auf dem Ordnernamen wählen
+            if contains(folderName, 'Druck', 'IgnoreCase', true)
+                outSubfolder = 'Output_PressureCalibration';
+                filePrefix = 'Analysis_Pressure_';
+            else
+                outSubfolder = 'Output_MassTransfer';
+                filePrefix = 'Analysis_Mass_';
+            end
+            outFolder = fullfile(projectRoot, 'output', outSubfolder);
+            if ~exist(outFolder, 'dir')
+                mkdir(outFolder);
+            end
+            outputFile = fullfile(outFolder, sprintf('%s%s.csv', filePrefix, folderName));
+            
             writetable(MasterTable, outputFile);
             fprintf('Gesamtergebnis gespeichert unter: %s\n', outputFile);
         else
@@ -82,7 +113,17 @@ function start_AnalysisFromGUI(mode, config, targetPath)
         end
         
     elseif strcmp(mode, 'batch')
-        error('Batch-Modus via GUI ist in dieser Wrapper-Version noch in Vorbereitung.');
+        fprintf('GUI startet Batch-Auswertung...\n');
+        
+        % baseDir ist der in der GUI ausgewählte Ordner
+        baseDir = targetPath;
+        
+        % Batch-Pipeline aufrufen
+        % Hinweis: Für eine 100% responsive GUI sollte dies später über parfeval
+        % ausgelagert werden. Für den Moment rufen wir es direkt auf.
+        runBatchPipeline(config, baseDir);
+        
+        fprintf('Batch-Auswertung erfolgreich abgeschlossen.\n');
     else
         error('Unbekannter Modus: %s', mode);
     end

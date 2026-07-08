@@ -27,10 +27,10 @@ function export_BatchResults(statsCell, outputBaseDir)
         outCO2   = num2str(teilTabelle.CO2_Anteil(1) * 100); 
         
         if aktuelleMessart == "Druckkalibrierung"
-            outFolder = fullfile(outputBaseDir, 'Ausgabe_Druckkalibrierung');
+            outFolder = fullfile(outputBaseDir, 'Output_PressureCalibration');
             prefix = 'Auswertung_Druck';
         else
-            outFolder = fullfile(outputBaseDir, 'Ausgabe_Massentransfer');
+            outFolder = fullfile(outputBaseDir, 'Output_MassTransfer');
             prefix = 'Auswertung_Masse';
         end
         
@@ -49,7 +49,7 @@ function export_BatchResults(statsCell, outputBaseDir)
         % Wir ersetzen die Endung .csv durch .png
         savePathPNG = strrep(savePath, '.csv', '.png');
         try
-            plot_MergedBatchResults(teilTabelle, savePathPNG);
+            %             plot_MergedBatchResults(teilTabelle, savePathPNG);
             fprintf('Plot gespeichert unter: %s\n', savePathPNG);
         catch ME
             warning('Fehler beim Plotten für %s: %s', fileName, ME.message);

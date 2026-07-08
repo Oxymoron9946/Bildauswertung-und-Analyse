@@ -98,8 +98,9 @@ function [resultsTable, statsTable, mean_UC_mm, L_ein_mm] = runAnalysisPipeline(
             imagesc(hAx, I_roi);
             colormap(hAx, gray);
             axis(hAx, 'image'); % Korrekte Proportionen
-            hold(hAx, 'on'); 
-            title(hAx, sprintf('Frame %d - Kanaldetektion & Tracking', frameIdx));
+            hold(hAx, 'on');
+            text(hAx, imgW/2, -30, sprintf('Frame %d - Channel Detection & Tracking', frameIdx), ...
+                'Color', 'k', 'FontWeight', 'bold', 'FontSize', 12, 'HorizontalAlignment', 'center');
             
             if exist('seeds', 'var') && ~isempty(seeds)
                 % 1. Das berechnete/gesperrte Kanalmodell in ROT einzeichnen
@@ -120,18 +121,24 @@ function [resultsTable, statsTable, mean_UC_mm, L_ein_mm] = runAnalysisPipeline(
                     plot(hAx, [rx, rx], [seeds.y_top_line(rx), seeds.y_bot_line(rx)], 'r-', 'LineWidth', 1.5);
                     
                     % Horizontale Linie über der Blase (Magenta)
-                    y_text_pos = seeds.y_top_line(round((lx+rx)/2)) - 15;
+                    y_text_pos = seeds.y_top_line(round((lx+rx)/2)) - 25;
                     plot(hAx, [lx, rx], [y_text_pos+5, y_text_pos+5], 'm-', 'LineWidth', 1);
                     
                     % Text mit Länge (Zahl oben, "mm" in der nächsten Zeile)
                     len_mm = (rx - lx) * px2mm;
                     text(hAx, (lx+rx)/2, y_text_pos, sprintf('%.2f\nmm', len_mm), ...
-                        'Color', 'm', 'FontWeight', 'bold', 'HorizontalAlignment', 'center', 'FontSize', 9);
+                        'Color', 'm', 'FontWeight', 'bold', 'HorizontalAlignment', 'center', 'FontSize', 14);
                 end
             end
-            
-            hold(hAx, 'off'); 
+            hold(hAx, 'off');
             drawnow;
+
+            % Abbruch durch Benutzer prüfen (Stop-Button in der GUI)
+            if isfield(config.ui, 'appFigure') && ~isempty(config.ui.appFigure) && ...
+               isvalid(config.ui.appFigure) && config.ui.appFigure.UserData.CancelRequested
+                fprintf('Abbruch durch Benutzer.\n');
+                break;
+            end
         end
     end
 

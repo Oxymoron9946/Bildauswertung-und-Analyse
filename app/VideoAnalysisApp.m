@@ -25,23 +25,26 @@ function VideoAnalysisApp()
     sensEndEdit = uieditfield(controlPanel, 'numeric', 'Position', [420 160 80 22], 'Value', 0.95);
     sensEndEdit.Enable = 'off'; % Standardmäßig Single-Modus
     
-    uilabel(controlPanel, 'Position', [340 120 100 22], 'Text', 'Min Pixel:');
-    minPixelEdit = uieditfield(controlPanel, 'numeric', 'Position', [420 120 80 22], 'Value', 50);
-    
-    uilabel(controlPanel, 'Position', [340 80 100 22], 'Text', 'FPS (Fallback):');
-    fpsEdit = uieditfield(controlPanel, 'numeric', 'Position', [420 80 80 22], 'Value', 200);
+    uilabel(controlPanel, 'Position', [340 80 150 22], 'Text', 'Show every N-th frame:');
+    visStepEdit = uieditfield(controlPanel, 'numeric', 'Position', [500 80 60 22], 'Value', 10);
     
     % --- Spalte 3: UI Optionen ---
     liveViewCheck = uicheckbox(controlPanel, 'Position', [540 200 200 22], 'Text', 'Show Live Visualization', 'Value', 1);
     calibCheck = uicheckbox(controlPanel, 'Position', [540 160 200 22], 'Text', 'Show Calibration Image', 'Value', 0);
-    exportCheck = uicheckbox(controlPanel, 'Position', [540 120 250 22], 'Text', 'Export Scientific Figures (Frame 15)', 'Value', 0);
     
     % --- Spalte 4: Ausführung ---
-    startButton = uibutton(controlPanel, 'Position', [780 140 180 80], 'Text', 'Start Analysis', ...
-        'FontSize', 16, 'FontWeight', 'bold', 'BackgroundColor', [0.2 0.6 0.2], 'FontColor', 'w', ...
+    startButton = uibutton(controlPanel, 'Position', [780 140 90 40], 'Text', 'Start', ...
+        'FontSize', 14, 'FontWeight', 'bold', 'BackgroundColor', [0.2 0.6 0.2], 'FontColor', 'w', ...
         'ButtonPushedFcn', @startPushed);
+    
+    stopButton = uibutton(controlPanel, 'Position', [875 140 90 40], 'Text', 'Stop', ...
+        'FontSize', 14, 'FontWeight', 'bold', 'BackgroundColor', [0.8 0.2 0.2], 'FontColor', 'w', ...
+        'ButtonPushedFcn', @stopPushed, 'Enable', 'off');
         
     statusLabel = uilabel(controlPanel, 'Position', [780 100 180 22], 'Text', 'Ready.', 'HorizontalAlignment', 'center');
+    
+    % Cancel-Flag in der UserData der Figur initialisieren
+    fig.UserData.CancelRequested = false;
     % =====================================================================
     % UNTERER BEREICH: VISUALISIERUNG (Tabs)
     % =====================================================================
@@ -63,12 +66,12 @@ function VideoAnalysisApp()
         if strcmp(event.NewValue.Tag, 'batch')
             liveViewCheck.Enable = 'off'; liveViewCheck.Value = 0;
             calibCheck.Enable = 'off'; calibCheck.Value = 0;
-            exportCheck.Enable = 'off'; exportCheck.Value = 0;
+            visStepEdit.Enable = 'off';
             sensEndEdit.Enable = 'on';
         else
             liveViewCheck.Enable = 'on'; liveViewCheck.Value = 1;
-            calibCheck.Enable = 'on'; 
-            exportCheck.Enable = 'on';
+            calibCheck.Enable = 'on';
+            visStepEdit.Enable = 'on';
             sensEndEdit.Enable = 'off';
         end
         pathEditField.Value = '';
@@ -81,6 +84,11 @@ function VideoAnalysisApp()
             path = uigetdir('', 'Select the main directory');
             if ~isequal(path, 0), pathEditField.Value = path; end
         end
+    end
+    function stopPushed(~, ~)
+        fig.UserData.CancelRequested = true;
+        stopButton.Enable = 'off';
+        statusLabel.Text = 'Cancelling...';
     end
     function startPushed(~, ~)
         targetPath = pathEditField.Value;
@@ -100,9 +108,6 @@ function VideoAnalysisApp()
         fpsToken = regexp(targetPath, '(\d+)fps', 'tokens');
         if ~isempty(fpsToken)
             config.video.fps = str2double(fpsToken{end}{1});
-            fpsEdit.Value = config.video.fps; 
-        else
-            config.video.fps = fpsEdit.Value; 
         end
         
         if strcmp(mode, 'single')
@@ -112,13 +117,18 @@ function VideoAnalysisApp()
             if isempty(config.detection.sensArray), config.detection.sensArray = sensStartEdit.Value; end
         end
         
-        config.detection.minPixel  = minPixelEdit.Value;
-        config.ui.showVisuals          = liveViewCheck.Value;
-        config.ui.showCalibrationImage = calibCheck.Value;
-        config.ui.exportImages         = exportCheck.Value; 
+        config.ui.showVisuals              = liveViewCheck.Value;
+        config.ui.showCalibrationImage     = calibCheck.Value;
+        config.ui.visualizeEveryNFrames    = visStepEdit.Value;
         
         % NEU: Übergebe die App-Achsen an die Config, damit die Pipeline sie nutzen kann
         config.ui.appAxes = appAxes;
+        % NEU: Übergebe die Figure-Referenz für den Cancel-Mechanismus
+        config.ui.appFigure = fig;
+        
+        % Cancel-Flag zurücksetzen und Stop-Button aktivieren
+        fig.UserData.CancelRequested = false;
+        stopButton.Enable = 'on';
         
         try
             startButton.Enable = 'off';
@@ -135,5 +145,6 @@ function VideoAnalysisApp()
             uialert(fig, ME.message, 'Execution Error');
         end
         startButton.Enable = 'on';
+        stopButton.Enable = 'off';
     end
 end

@@ -9,6 +9,8 @@ function visualize_Results(resultsTable, statsTable, targetAxes)
     % --- MODUS 1: Zeichnen in die App-GUI ---
     if nargin >= 3 && ~isempty(targetAxes) && isvalid(targetAxes)
         cla(targetAxes);
+        axis(targetAxes, 'auto');  % Setzt das durch axis image gesetzte DataAspectRatio zurück
+        set(targetAxes, 'YDir', 'normal');  % Stellt sicher, dass Y nicht mehr auf 'reverse' steht (von imagesc/axis image)
         
         % Wir zeichnen den wichtigsten Plot: Blasenlänge über Kanalposition
         scatter(targetAxes, resultsTable.Position_X_mm, resultsTable.BubbleLength_mm, 15, resultsTable.Speed_m_s, ...
@@ -16,13 +18,28 @@ function visualize_Results(resultsTable, statsTable, targetAxes)
         
         colormap(targetAxes, 'jet');
         cb = colorbar(targetAxes);
-        cb.Label.String = 'Geschwindigkeit [m/s]';
+        cb.Label.String = 'Velocity [m/s]';
         
-        xlabel(targetAxes, 'Kanalposition X [mm] (Distanz ab Einlass)');
-        ylabel(targetAxes, 'Blasenlaenge [mm]');
-        title(targetAxes, 'Feedback: Blasenlaengenabnahme ueber Kanallaenge');
+        xlabel(targetAxes, 'Channel Position X [mm] (Distance from inlet)');
+        ylabel(targetAxes, 'Bubble Length [mm]');
+        title(targetAxes, 'Feedback: Bubble Length Decrease over Channel Length');
         grid(targetAxes, 'on');
-        
+
+        % Skalierung optimieren: tote Bereiche entfernen (X) und Stauchung beheben (Y)
+        min_x = min(resultsTable.Position_X_mm);
+        max_x = max(resultsTable.Position_X_mm);
+        xlim(targetAxes, [min_x, max_x]);
+
+        min_y = min(resultsTable.BubbleLength_mm);
+        max_y = max(resultsTable.BubbleLength_mm);
+        span_y = max_y - min_y;
+        if span_y == 0
+            padding = 0.5;
+        else
+            padding = 0.1 * span_y;
+        end
+        ylim(targetAxes, [max(0, min_y - padding), max_y + padding]);
+
         return; % Beende die Funktion hier, öffne keine neuen Fenster!
     end
     % --- MODUS 2: Standalone (Skript-Aufruf) ---
@@ -37,24 +54,24 @@ function visualize_Results(resultsTable, statsTable, targetAxes)
         plot(xFit, polyval(p, xFit), 'k--', 'LineWidth', 1.5);
         hold off;
     end
-    xlabel('Lokale Blasenlaenge [mm]'); ylabel('Lokale Geschwindigkeit [m/s]');
-    title('Geschwindigkeit vs. Blasenlaenge'); grid on;
+    xlabel('Local Bubble Length [mm]'); ylabel('Local Velocity [m/s]');
+    title('Velocity vs. Bubble Length'); grid on;
     subplot(1, 2, 2);
     scatter(resultsTable.Position_X_mm, resultsTable.BubbleLength_mm, 15, resultsTable.Speed_m_s, ...
         'filled', 'MarkerEdgeAlpha', 0.4, 'MarkerFaceAlpha', 0.4);
-    colormap('jet'); cb = colorbar; cb.Label.String = 'Geschwindigkeit [m/s]';
-    xlabel('Kanalposition X [mm]'); ylabel('Blasenlaenge [mm]');
-    title('Blasenlaengenabnahme ueber Kanallaenge'); grid on;
+    colormap('jet'); cb = colorbar; cb.Label.String = 'Velocity [m/s]';
+    xlabel('Channel Position X [mm]'); ylabel('Bubble Length [mm]');
+    title('Bubble length decrease over channel length'); grid on;
     if ~isempty(statsTable)
-        figure('Name', 'Verlauf der Unit-Cell und Blasenlaenge', 'Position', [150, 150, 800, 500]);
+        figure('Name', 'Profile of Unit Cell and Bubble Length', 'Position', [150, 150, 800, 500]);
         hold on;
         errorbar(statsTable.BinCenter_mm, statsTable.mean_BubbleLength_mm, statsTable.std_BubbleLength_mm, ...
             '-o', 'LineWidth', 2, 'MarkerSize', 8, 'MarkerFaceColor', 'b', 'Color', 'b');
         errorbar(statsTable.BinCenter_mm, statsTable.mean_UnitCellLength_mm, statsTable.std_UnitCellLength_mm, ...
             '-s', 'LineWidth', 2, 'MarkerSize', 8, 'MarkerFaceColor', 'r', 'Color', 'r');
-        xlabel('Kanalposition X [mm]'); ylabel('Laenge [mm]');
-        title('Verlauf der mittleren Blasen- und Unit-Cell-Laenge');
-        legend({'Blasenlaenge', 'Unit-Cell Laenge'}, 'Location', 'best');
+        xlabel('Channel Position X [mm]'); ylabel('Length [mm]');
+        title('Profile of mean Bubble and Unit Cell Length');
+        legend({'Bubble Length', 'Unit Cell Length'}, 'Location', 'best');
         grid on; hold off;
     end
 end

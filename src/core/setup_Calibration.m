@@ -83,13 +83,17 @@ function [px2mm, calibSuccess] = setup_Calibration(firstFrameGray, showCalibrati
                 global_firstTick = firstTick_X_local + x_margin - 1;
                 global_lastTick  = lastTick_X_local + x_margin - 1;
                 totalImageLength_mm = imgW_full * px2mm;
-                fprintf('=> Gesamte angezeigte Bildlaenge: %.2f mm\n', totalImageLength_mm);
+                if showCalibrationImage
+                    fprintf('=> Gesamte angezeigte Bildlaenge: %.2f mm\n', totalImageLength_mm);
+                end
             end
         end
     end
 
     if ~calibSuccess
-        warning('Kalibrierung des Massstabs fehlgeschlagen. px2mm auf NaN gesetzt.');
+        if showCalibrationImage
+            warning('Kalibrierung des Massstabs fehlgeschlagen. px2mm auf NaN gesetzt.');
+        end
     end
 
     % %% 3. Automatische ROI-Erkennung (Kanalwaende) — DEAKTIVIERT (historischer Entwurf)
