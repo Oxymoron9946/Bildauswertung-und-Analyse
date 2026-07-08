@@ -18,6 +18,11 @@ function [bubbleTracker, prevBubbleCentroids, nextBubbleID] = track_Bubbles(curr
 %   bubbleTracker          - Aktualisiertes Protokoll inkl. dieses Frames
 %   prevBubbleCentroids    - Zentroide dieses Frames (für den Abgleich im nächsten Frame)
 %   nextBubbleID           - Aktualisierte Zählervariable
+%
+% BATCH / EINZEL (main_Batch.m, main_einzel.m):
+%   Wird pro Frame nach detect_Bubbles aufgerufen; bubbleTracker sammelt Zeilen
+%   [ID, Frame, X_Start_UC_px, BubbleLen_px, UC_Len_px] für evaluate_Physics.
+%   Strömung rechts → links (höhere X: ältere Position); maxJumpDist_px aus params.
 
     %% 1. Initialisierung & Sicherheitsabbruch
     newPrevBubbleCentroids = [];

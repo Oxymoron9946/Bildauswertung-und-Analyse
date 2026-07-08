@@ -1,4 +1,4 @@
-function [resultsTable, statsTable] = evaluate_Physics(bubbleTracker, px2mm, fps, minFramesTracked, imgW, kanalStart_mm, binSize_mm, mean_UC_mm)
+function [resultsTable, statsTable] = evaluate_Physics(bubbleTracker, px2mm, fps, minFramesTracked, imgW, kanalStart_mm, binSize_mm, mean_UC_mm, L_ein_mm)
 % EVALUATE_PHYSICS Berechnet Geschwindigkeiten und lokale Längen im Taylor-Flow.
 %
 % Diese Funktion nimmt die Rohdaten aus dem Bubble-Tracker und wandelt sie
@@ -15,6 +15,18 @@ function [resultsTable, statsTable] = evaluate_Physics(bubbleTracker, px2mm, fps
 % kanalStart_mm    - Reale Position des rechten Bildrandes im Reaktor (z.B. 0 oder 181.5 mm)
 % binSize_mm       - Rastergröße für die örtliche Mittelung (z.B. 2 mm Bins)
 % mean_UC_mm       - (Legacy) Globale Unit-Cell-Länge. Wird ignoriert, da wir nun lokal tracken.
+% L_ein_mm         - (Optional) Berechnete hydrodynamische Einlauflänge in mm. Blasen davor werden ignoriert.
+%
+% BATCH (main_Batch.m): Aufruf (1) nach komplettem Video-Durchlauf je Sensitivität,
+% (2) beim Early-Abort auf Teildaten nach framesToTest Frames. Filter „Blase ID 1“
+% an Kameraposition 1 erfolgt im Aufrufer vor/nach dem Tracker, nicht in dieser Funktion.
+%
+% BLOCK 6 — Stichpunkte zur Arbeit (LaTeX: Unterabschnitt batch_evaluate_physics):
+% - kanalStart_mm = Laborbuch Offset; imgW = ROI-Breite [px]; absolutePosX_mm ab rechtem Rand.
+% - minFramesTracked: kurze IDs raus; mean_UC_mm Eingang wird ignoriert (lokale UC aus Spalte 5).
+% - Nach resultsTable: ggf. binSize_mm an mittlere Blasenlänge anpassen; histcounts → BinCenter_mm.
+% - Plateau (mittlere Bins, Median, 50-%-Schwelle, längste zusammenhängende Zone) → grpstats nur inZone.
+% - UserData an statsTable: validStart, validEnd, firstMeas (Diagnose).
 
 %% 1. Initialisierung & Abbruchbedingung
 % Wenn keine Blasen gefunden wurden oder die Matrix unvollständig ist, 
@@ -77,6 +89,11 @@ for i = 1:length(uniqueIDs)
     mid_bubble_len_px = (bubble_len_px(1:end-1) + bubble_len_px(2:end)) / 2;
     mid_uc_len_px     = (uc_len_px(1:end-1) + uc_len_px(2:end)) / 2;
     
+    % Örtliche Zuordnung auf die Mitte der Blase verschieben.
+    % x_px ist der Start der Blase (rechte Kante, da Strömung von rechts nach links).
+    % Um die Mitte der Blase zu erhalten, ziehen wir die halbe Blasenlänge ab.
+    mid_x_px = mid_x_px - (mid_bubble_len_px / 2);
+    
     % Filter gegen physikalisch unmögliche Ausreißer beim Tracking
     % (z.B. wenn der Tracker kurzzeitig eine falsche Blase anspringt)
     valid = (v_m_s > 0) & (v_m_s < 5); % Max 5 m/s erlaubt
@@ -112,6 +129,19 @@ distFromRight_mm = (imgW - all_X_mm) * px2mm;
 
 % Danach addieren wir diesen Abstand zum Offset der Kamera (kanalStart_mm)
 absolutePosX_mm = kanalStart_mm + distFromRight_mm;
+
+% Blasen filtern, die innerhalb der Einlauflänge liegen
+if nargin >= 9 && ~isnan(L_ein_mm) && L_ein_mm > 0
+    valid_einlauf = absolutePosX_mm >= L_ein_mm;
+    
+    all_IDs = all_IDs(valid_einlauf);
+    absolutePosX_mm = absolutePosX_mm(valid_einlauf);
+    all_V_m_s = all_V_m_s(valid_einlauf);
+    all_BubbleLength_mm = all_BubbleLength_mm(valid_einlauf);
+    all_UnitCell_mm = all_UnitCell_mm(valid_einlauf);
+    all_SlugLength_mm = all_SlugLength_mm(valid_einlauf);
+    all_VoidFraction = all_VoidFraction(valid_einlauf);
+end
 
 % Alles in einer übersichtlichen Tabelle ("Rohdaten") speichern
 resultsTable = table(all_IDs, absolutePosX_mm, all_V_m_s, ...

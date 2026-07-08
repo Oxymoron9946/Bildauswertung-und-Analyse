@@ -8,6 +8,11 @@ function [px2mm, calibSuccess] = setup_Calibration(firstFrameGray, showCalibrati
 % Rueckgaben:
 %   px2mm - Umrechnungsfaktor (mm pro Pixel) (NaN falls fehlerhaft)
 %   calibSuccess - Boolean, ob die Kalibrierung erfolgreich war
+%
+% AUFRUFER: main_Batch (showCalibrationImage=false), main_einzel (oft true zum Prüfen).
+% ALGORITHMUS-KERN: horizontale Tick-Kette auf Lineal → bekannte Rasterweite
+% 0.525 mm pro Intervall → mm/px. Ausführliche numerische Schwellen siehe Kommentare
+% in Abschnitt 2 (für die Arbeit ggf. verkürzt darstellen).
 
     %% 1. Initialisierung
     [imgH_full, imgW_full] = size(firstFrameGray);
@@ -16,6 +21,11 @@ function [px2mm, calibSuccess] = setup_Calibration(firstFrameGray, showCalibrati
     calibSuccess = false;
 
     %% 2. Automatische Kalibrierung (Lineal-Erkennung)
+    % Ablauf: vertikaler Suchstreifen → Zeile mit stärksten vertikalen Kanten
+    % (Sobel) → horizontales Band um diese Y-Lage → Mittelung über Y im Band
+    % → invertieren + Glättung → Peaks = Ticks → längste Kette ähnlicher
+    % Peak-Abstände → mm aus 0.525 * Anzahl_Intervalle, px aus Tick-Pixeldifferenz.
+    %
     % Suchbereich fuer das Lineal (vertikale Mitte des oberen Bildteils)
     searchStartY = floor(imgH_full * 0.30);
     searchEndY   = floor(imgH_full * 0.80);
@@ -82,7 +92,9 @@ function [px2mm, calibSuccess] = setup_Calibration(firstFrameGray, showCalibrati
         warning('Kalibrierung des Massstabs fehlgeschlagen. px2mm auf NaN gesetzt.');
     end
 
-    % %% 3. Automatische ROI-Erkennung (Kanalwaende)
+    % %% 3. Automatische ROI-Erkennung (Kanalwaende) — DEAKTIVIERT (historischer Entwurf)
+    % Wäre aktiv, würde roi aus unterem Bilddrittel schätzen; wird vom Batch nicht
+    % genutzt (ROI kommt später aus Vollbild / detect_Bubbles-Kontext).
     % % Der Kanal befindet sich im unteren Drittel des Bildes
     % lowerThirdStartY = floor(imgH_full * 2/3);
     % lowerThirdImg    = firstFrameGray(lowerThirdStartY:end, :);
@@ -121,7 +133,8 @@ function [px2mm, calibSuccess] = setup_Calibration(firstFrameGray, showCalibrati
     %     calibSuccess = false; % Wenn ROI fehlt, gilt Kalibrierung insgesamt als fehlgeschlagen
     % end
 
-%% 4. Visuelle Kontrolle (Nur falls angefordert)
+    %% 4. Visuelle Kontrolle (Nur falls angefordert)
+    % 5 s Pause, dann Fenster schließen — für Batch unüblich (immer false).
     if showCalibrationImage
         hFigCalib = figure('Name', 'Kalibrierung Kontrolle');
         imshow(firstFrameGray, []); hold on;

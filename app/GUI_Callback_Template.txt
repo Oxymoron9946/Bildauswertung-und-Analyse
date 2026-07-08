@@ -1,0 +1,51 @@
+% =========================================================================
+% ANLEITUNG FÜR DEN MATLAB APP DESIGNER
+% =========================================================================
+% Kopiere diesen Code in die Callback-Funktion deines "Start"-Buttons 
+% (z.B. StartButtonPushed) in der App Designer GUI.
+% =========================================================================
+
+% 1. Lade die Standardkonfiguration
+projectRoot = pwd; % Geht davon aus, dass die App im Hauptordner gestartet wird
+config = defaultConfig(projectRoot);
+
+% 2. Überschreibe die Config mit den Werten aus der GUI
+% (Passe die Namen der UI-Elemente an deine App an!)
+config.detection.sens = app.SensitivitaetSlider.Value;
+config.detection.minPixel = app.MinPixelEditField.Value;
+config.video.fps = app.FPSEditField.Value;
+
+% 3. UI-Einstellungen aus der GUI übernehmen
+config.ui.showVisuals = app.LiveAnsichtCheckBox.Value;
+config.ui.showCalibrationImage = app.KalibrierbildZeigenCheckBox.Value;
+
+% 4. Modus und Pfad auslesen
+if app.EinzelvideoButton.Value == true
+    mode = 'single';
+    targetPath = app.VideoPfadEditField.Value;
+else
+    mode = 'batch';
+    targetPath = app.OrdnerPfadEditField.Value;
+end
+
+% 5. Ausführung starten
+% HINWEIS: Für eine responsive GUI sollte dies später über parfeval() 
+% in den Hintergrund ausgelagert werden. Für den Anfang reicht der direkte Aufruf:
+try
+    % Deaktiviere den Start-Button, damit der Nutzer nicht doppelt klickt
+    app.StartButton.Enable = 'off';
+    app.StatusLabel.Text = 'Auswertung läuft... Bitte warten.';
+    drawnow;
+    
+    % Rufe den Controller auf
+    start_AnalysisFromGUI(mode, config, targetPath);
+    
+    app.StatusLabel.Text = 'Auswertung erfolgreich abgeschlossen!';
+catch ME
+    % Fehlerbehandlung
+    app.StatusLabel.Text = 'Fehler aufgetreten!';
+    uialert(app.UIFigure, ME.message, 'Fehler bei der Auswertung');
+end
+
+% Button wieder aktivieren
+app.StartButton.Enable = 'on';
