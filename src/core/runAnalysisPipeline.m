@@ -97,9 +97,11 @@ function [resultsTable, statsTable, mean_UC_mm, L_ein_mm] = runAnalysisPipeline(
             % imshow verhält sich in UIAxes manchmal zickig, imagesc ist robuster
             imagesc(hAx, I_roi);
             colormap(hAx, gray);
+            title(hAx, ''); % Löscht das alte "Waiting for video..."
+            ylim(hAx, [-80, imgH]); % Erweitert die Achse nach oben, um Platz für Text zu schaffen
             axis(hAx, 'image'); % Korrekte Proportionen
             hold(hAx, 'on');
-            text(hAx, imgW/2, -30, sprintf('Frame %d - Channel Detection & Tracking', frameIdx), ...
+            text(hAx, imgW/2, -60, sprintf('Frame %d - Channel Detection & Tracking', frameIdx), ...
                 'Color', 'k', 'FontWeight', 'bold', 'FontSize', 12, 'HorizontalAlignment', 'center');
             
             if exist('seeds', 'var') && ~isempty(seeds)
@@ -121,7 +123,7 @@ function [resultsTable, statsTable, mean_UC_mm, L_ein_mm] = runAnalysisPipeline(
                     plot(hAx, [rx, rx], [seeds.y_top_line(rx), seeds.y_bot_line(rx)], 'r-', 'LineWidth', 1.5);
                     
                     % Horizontale Linie über der Blase (Magenta)
-                    y_text_pos = seeds.y_top_line(round((lx+rx)/2)) - 25;
+                    y_text_pos = seeds.y_top_line(round((lx+rx)/2)) - 20;
                     plot(hAx, [lx, rx], [y_text_pos+5, y_text_pos+5], 'm-', 'LineWidth', 1);
                     
                     % Text mit Länge (Zahl oben, "mm" in der nächsten Zeile)

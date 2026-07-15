@@ -89,6 +89,17 @@ function VideoAnalysisApp()
         fig.UserData.CancelRequested = true;
         stopButton.Enable = 'off';
         statusLabel.Text = 'Cancelling...';
+        drawnow;
+        
+        % Nur im Batch-Modus relevant: Hartes Beenden der parallelen Worker
+        if strcmp(bg.SelectedObject.Tag, 'batch')
+            statusLabel.Text = 'Killing parallel pool...';
+            drawnow;
+            poolobj = gcp('nocreate'); % Hole den aktuellen Pool
+            if ~isempty(poolobj)
+                delete(poolobj); % Schließt alle Worker hart ab
+            end
+        end
     end
     function startPushed(~, ~)
         targetPath = pathEditField.Value;

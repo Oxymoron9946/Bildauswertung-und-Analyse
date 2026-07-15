@@ -9,7 +9,10 @@ function visualize_Results(resultsTable, statsTable, targetAxes)
     % --- MODUS 1: Zeichnen in die App-GUI ---
     if nargin >= 3 && ~isempty(targetAxes) && isvalid(targetAxes)
         cla(targetAxes);
-        axis(targetAxes, 'auto');  % Setzt das durch axis image gesetzte DataAspectRatio zurück
+        % Löse alle fixen Seitenverhältnisse komplett auf
+        axis(targetAxes, 'normal');
+        set(targetAxes, 'DataAspectRatioMode', 'auto');
+        set(targetAxes, 'PlotBoxAspectRatioMode', 'auto');
         set(targetAxes, 'YDir', 'normal');  % Stellt sicher, dass Y nicht mehr auf 'reverse' steht (von imagesc/axis image)
         
         % Wir zeichnen den wichtigsten Plot: Blasenlänge über Kanalposition

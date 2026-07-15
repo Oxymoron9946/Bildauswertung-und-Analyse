@@ -38,3 +38,15 @@ codegen/
 # SimBiology backup files
 *.sbproj.backup
 *.sbproj.bak
+
+# Video and data output directories
+Glaskanal/
+PTFE_1000_600/
+PVC_1000_600/
+PVC_1500_1150/
+output/
+
+# Video and CSV files
+*.avi
+*.mp4
+*.csv

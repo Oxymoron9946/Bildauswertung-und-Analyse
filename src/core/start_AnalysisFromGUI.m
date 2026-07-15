@@ -12,8 +12,38 @@ function start_AnalysisFromGUI(mode, config, targetPath)
     if strcmp(mode, 'single')
         fprintf('GUI startet Einzelvideo-Auswertung...\n');
         
-        calibFile = config.paths.calibFile;
+        % Dynamische Kalibrierdatei suchen (statt hartem Config-Pfad)
         videoFile = targetPath;
+        
+        % Kalibriergruppen-Token aus dem Messvideo-Pfad extrahieren
+        groupTok = regexp(videoFile, '(Pos_\d+_Kal_\d+)', 'tokens');
+        if isempty(groupTok)
+            error('Video-Pfad enthält kein "Pos_X_Kal_Y"-Token. Dynamische Kalibriersuche nicht möglich.');
+        end
+        groupName = groupTok{1}{1};
+        
+        % Startpunkt für die rekursive Suche: den groupName-Ordner im Pfad finden
+        idx = strfind(videoFile, groupName);
+        if isempty(idx)
+            error('Der Ordnername "%s" wurde nicht im Videopfad gefunden.', groupName);
+        end
+        % Schneide den Pfad exakt nach dem groupName ab
+        searchBase = videoFile(1 : idx(1) + length(groupName) - 1);
+        
+        % Suche in diesem Basis-Ordner nach dem Kalibrier-AVI
+        calibVideoFiles = dir(fullfile(searchBase, '**', 'Kalibrierung_*', '*.avi'));
+        
+        calibFile = '';
+        for c = 1:length(calibVideoFiles)
+            % Nimm die erste gefundene Kalibrierdatei, da sie im selben groupName-Ordner liegt
+            calibFile = fullfile(calibVideoFiles(c).folder, calibVideoFiles(c).name);
+            fprintf('Kalibrierdatei dynamisch gefunden: %s\n', calibFile);
+            break;
+        end
+        
+        if isempty(calibFile)
+            error('Kalibrierdatei für Gruppe "%s" nicht gefunden.', groupName);
+        end
         
         % Basis-Parameter setzen
         params.videoFile             = videoFile;
