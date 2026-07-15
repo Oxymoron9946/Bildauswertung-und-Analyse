@@ -23,12 +23,25 @@ function start_AnalysisFromGUI(mode, config, targetPath)
         groupName = groupTok{1}{1};
         
         % Startpunkt für die rekursive Suche: den groupName-Ordner im Pfad finden
-        idx = strfind(videoFile, groupName);
-        if isempty(idx)
+        % Plattformunabhängig mittels fileparts den Pfad so lange einkürzen,
+        % bis der groupName-Ordner erreicht ist.
+        searchBase = videoFile;
+        found = false;
+        while true
+            [parent, folder, ~] = fileparts(searchBase);
+            if strcmp(folder, groupName)
+                searchBase = fullfile(parent, folder);
+                found = true;
+                break;
+            end
+            if isempty(parent) || strcmp(parent, searchBase)
+                break;
+            end
+            searchBase = parent;
+        end
+        if ~found
             error('Der Ordnername "%s" wurde nicht im Videopfad gefunden.', groupName);
         end
-        % Schneide den Pfad exakt nach dem groupName ab
-        searchBase = videoFile(1 : idx(1) + length(groupName) - 1);
         
         % Suche in diesem Basis-Ordner nach dem Kalibrier-AVI
         calibVideoFiles = dir(fullfile(searchBase, '**', 'Kalibrierung_*', '*.avi'));
@@ -69,11 +82,14 @@ function start_AnalysisFromGUI(mode, config, targetPath)
 
         % --- Offset aus dem Laborbuch auslesen (statt blindem Config-Fallback) ---
         [videoFolder, ~, ~] = fileparts(videoFile);
-        folders = strsplit(videoFolder, filesep);
-        if contains(folders{end}, 'fps', 'IgnoreCase', true)
-            folderName = folders{end-1};
+        [parentFolder, currentFolder, currentExt] = fileparts(videoFolder);
+        currentFolder = strcat(currentFolder, currentExt); % Vermeintliche Endung wieder anhängen
+
+        if contains(currentFolder, 'fps', 'IgnoreCase', true)
+            [~, fName, fExt] = fileparts(parentFolder);
+            folderName = strcat(fName, fExt);
         else
-            folderName = folders{end};
+            folderName = currentFolder;
         end
         labTable = load_Laborbuch(config.paths.laborbuch);
         labMatchIdx = find(strcmp(string(labTable.Dateiname), folderName));
