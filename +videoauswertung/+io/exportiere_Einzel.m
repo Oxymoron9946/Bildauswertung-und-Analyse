@@ -1,8 +1,8 @@
 function datei = exportiere_Einzel(tabelle, m, ausgabe)
 % EXPORTIERE_EINZEL Schreibt das Ergebnis einer Einzelauswertung als CSV (Komma).
 %
-% Datei: <ausgabe>/Output_PressureCalibration/Analysis_Pressure_<Messlauf>.csv
-%    bzw. <ausgabe>/Output_MassTransfer/Analysis_Mass_<Messlauf>.csv
+% Datei: <ausgabe>/Output_PressureCalibration/Analysis_Pressure_<Messlauf>_<Aufnahme>.csv
+%    bzw. <ausgabe>/Output_MassTransfer/Analysis_Mass_<Messlauf>_<Aufnahme>.csv
 %
 % Parameter
 % ---------
@@ -24,7 +24,11 @@ function datei = exportiere_Einzel(tabelle, m, ausgabe)
     if ~isfolder(ordner)
         mkdir(ordner);
     end
-    datei = fullfile(ordner, sprintf('%s%s.csv', praefix, m.name));
+    name = m.name;
+    if strlength(m.aufnahme) > 0
+        name = sprintf('%s_%s', name, m.aufnahme);
+    end
+    datei = fullfile(ordner, sprintf('%s%s.csv', praefix, name));
     writetable(tabelle, datei);
     fprintf('Gesamtergebnis gespeichert unter: %s\n', datei);
 end

@@ -16,6 +16,8 @@ function m = lies_Messlauf(video)
 % --------
 % m : struct mit
 %     name        Messlauf (Ordnername)
+%     aufnahme    Aufnahmeordner "<fps>fps_<nnn>" ("" wenn das Video direkt im Messlauf liegt);
+%                 mehrere Aufnahmen desselben Messlaufs unterscheiden sich nur hier
 %     gruppe      Kalibriergruppe "Pos_<n>_Kal_<k>" ('' wenn nicht im Pfad)
 %     messart     "Druckkalibrierung" oder "Massentransfer"
 %     schema      true, wenn der Ordnername dem Schema entspricht
@@ -30,8 +32,10 @@ function m = lies_Messlauf(video)
     if contains(aktuell, 'fps', 'IgnoreCase', true)
         [~, n, e] = fileparts(eltern);
         m.name = strcat(n, e);
+        m.aufnahme = string(aktuell);
     else
         m.name = aktuell;
+        m.aufnahme = "";
     end
 
     tok = regexp(video, '(Pos_\d+_Kal_\d+)', 'tokens');
