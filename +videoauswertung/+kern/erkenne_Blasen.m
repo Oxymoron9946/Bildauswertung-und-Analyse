@@ -8,8 +8,8 @@ function [blasen, kanal, det, uc_px, B_vorher, B_nachher, seeds] = erkenne_Blase
 %      Typ 1 = linke Blasenkante, Typ 2 = linke Slugkante
 %   4. Alternanz 1/2/1/2 erzwingen (Störkanten nach Abstandsrhythmus entfernen)
 %   5. Region Growing füllt die Blasen schwarz                       -> B_nachher
-%   6. Blasen als schwarze Abschnitte auf der Mittellinie, Unit-Cells aus
-%      benachbarten Blasen
+%   6. Blasen als schwarze Abschnitte auf der Mittellinie; durch Reflexionen
+%      zerteilte Blasen wieder verbinden; Unit-Cells aus benachbarten Blasen
 %
 % Parameter
 % ---------
@@ -66,6 +66,9 @@ function [blasen, kanal, det, uc_px, B_vorher, B_nachher, seeds] = erkenne_Blase
     end
 
     [det, seeds] = blasen_auf_Mittellinie(B_nachher, y_mid, seeds, imgW, imgH, cfg);
+    if cfg.detektion.fragmente_verbinden
+        det = verbinde_Fragmente(det, cfg);
+    end
     if numel(det) < 1
         return;
     end
@@ -699,6 +702,52 @@ function [det, seeds] = blasen_auf_Mittellinie(B, y_mid, seeds, imgW, imgH, cfg)
     if ~isempty(det)
         [~, sIdx] = sort([det.cx], 'descend');
         det = det(sIdx);
+    end
+end
+
+function det = verbinde_Fragmente(det, cfg)
+    % Reflexionen können eine Blase in Fragmente teilen; dazwischen liegt
+    % dann ein scheinbarer, sehr kurzer Slug. Die typische Slug-Länge ist
+    % der Median der am stärksten besetzten Klasse eines Histogramms
+    % (cfg.detektion.fragment_klassen Klassen). Slugs kürzer als
+    % cfg.detektion.fragment_schwelle_rel mal diese Länge gelten als
+    % Reflexion: die beiden angrenzenden Fragmente werden verbunden.
+    if numel(det) < 3
+        return;
+    end
+    slugs = [];
+    for j = 1:(numel(det)-1)
+        len = det(j).leftX - det(j+1).rightX;
+        if len > 0
+            slugs(end+1) = len; %#ok<AGROW>
+        end
+    end
+    if numel(slugs) < cfg.detektion.fragment_min_slugs
+        return;
+    end
+    slugs = sort(slugs);
+    kanten = linspace(min(slugs), max(slugs), cfg.detektion.fragment_klassen + 1);
+    [anzahl, ~, klasse] = histcounts(slugs, kanten);
+    [~, haeufigste] = max(anzahl);
+    schwelle = cfg.detektion.fragment_schwelle_rel * median(slugs(klasse == haeufigste));
+
+    % Von links nach rechts prüfen; nach dem Verbinden dieselbe Stelle erneut
+    j = numel(det) - 1;
+    while j >= 1
+        len = det(j).leftX - det(j+1).rightX;
+        if len > 0 && len < schwelle
+            % Fragment j+1 (links) übernimmt die rechte Kante von Fragment j
+            det(j+1).rightX = det(j).rightX;
+            det(j+1).rightY = det(j).rightY;
+            det(j+1).cx = (det(j+1).leftX + det(j+1).rightX) / 2;
+            det(j+1).bb(3) = det(j+1).rightX - det(j+1).leftX;
+            det(j) = [];
+            if j > numel(det) - 1
+                j = numel(det) - 1;
+            end
+        else
+            j = j - 1;
+        end
     end
 end
 
