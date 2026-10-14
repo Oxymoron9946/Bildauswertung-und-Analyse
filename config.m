@@ -60,7 +60,7 @@ function cfg = config()
     cfg.detektion.abstand_ersatz_px = 50;   % Ersatz-Kantenabstand, wenn kein Median bestimmbar [px]
     cfg.detektion.min_blase_px    = 5;      % Blasen bis zu dieser Länge werden verworfen [px]
     cfg.detektion.randabstand_px  = 2;      % Unit-Cells am Bildrand verwerfen [px]
-    cfg.detektion.fragmente_verbinden  = true;  % durch Reflexionen zerteilte Blasen verbinden
+    cfg.detektion.fragmente_verbinden  = false; % durch Reflexionen zerteilte Blasen verbinden (experimentell, siehe docs/08_grenzen.md)
     cfg.detektion.fragment_schwelle_rel = 0.7;  % Slug kürzer als Anteil der typischen Slug-Länge = Reflexion
     cfg.detektion.fragment_min_slugs   = 4;     % Mindestanzahl Slugs im Frame für die typische Länge
     cfg.detektion.fragment_klassen     = 10;    % Histogrammklassen für die typische Slug-Länge
