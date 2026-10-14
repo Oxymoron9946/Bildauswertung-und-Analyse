@@ -3,7 +3,6 @@ function [datei, rohdaten, tabelle] = auswerten_Einzel(cfg, video, sensListe, ru
 %
 % Kalibriervideo: erstes Video in einem Kalibrierordner unterhalb des
 % Ordners der Kalibriergruppe "Pos_<n>_Kal_<k>" im Videopfad.
-% Bildrate: aus "<fps>fps" im Pfad, sonst cfg.video.fps.
 % Offset: aus dem Laborbuch; fehlt der Eintrag, gilt cfg.physik.kanalstart_mm
 % (Befund F11: ohne Fehlermeldung).
 %
@@ -34,11 +33,6 @@ function [datei, rohdaten, tabelle] = auswerten_Einzel(cfg, video, sensListe, ru
             'Video-Pfad enthält kein "Pos_X_Kal_Y"-Token. Kalibriersuche nicht möglich.');
     end
     kalib = suche_Kalibrierung(video, m.gruppe, cfg);
-
-    fpsTok = regexp(video, '(\d+)fps', 'tokens');
-    if ~isempty(fpsTok)
-        cfg.video.fps = str2double(fpsTok{end}{1});
-    end
 
     labor = videoauswertung.io.lade_Laborbuch(cfg.pfade.laborbuch);
     zeile = find(strcmp(string(labor.Dateiname), m.name));

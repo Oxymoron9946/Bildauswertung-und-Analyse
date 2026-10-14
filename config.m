@@ -27,7 +27,7 @@ function cfg = config()
 
     %% Video
     cfg.video.dateimuster = 'XSM-3520 Camera 0330_*.avi';  % Dateiname der Kamera-AVIs
-    cfg.video.fps         = 200;                            % Bildrate [1/s]
+    cfg.video.fps         = 200;                            % Bildrate [1/s], nur wenn der Pfad kein "<n>fps" enthält
 
     %% Kalibrierung (Lineal im ersten Frame des Kalibriervideos)
     cfg.kalibrierung.ordnermuster        = 'Kalibrierung_*';

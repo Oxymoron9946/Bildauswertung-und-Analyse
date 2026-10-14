@@ -23,6 +23,7 @@ function m = lies_Messlauf(video)
 %     pos         Kameraposition
 %     form, material  Text ("NaN" ohne Schema)
 %     kanal, nadel    Text [µm] ("NaN" ohne Schema)
+%     fps         Bildrate aus "<fps>fps" im Videopfad [1/s], NaN wenn nicht vorhanden
 
     [ordner, ~, ~] = fileparts(video);
     [eltern, aktuell, endung] = fileparts(ordner);
@@ -42,6 +43,13 @@ function m = lies_Messlauf(video)
     end
 
     m.messart = messart(m.name);
+
+    fpsTok = regexp(video, '(\d+)fps', 'tokens');
+    if isempty(fpsTok)
+        m.fps = NaN;
+    else
+        m.fps = str2double(fpsTok{end}{1});
+    end
 
     t = regexp(m.name, ['(?<gas>[\d\.]+)_(?<liq>[\d\.]+)_Pos_(?<pos>\d+)_(?<form>[A-Za-z]+)_' ...
         '(?<kanal>\d+)_(?<mat>[A-Za-z]+)_(?<nadel>\d+)'], 'names');
