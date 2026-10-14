@@ -21,7 +21,7 @@ classdef test_GuiStart < matlab.unittest.TestCase
 
         function startwerteAusConfig(testCase)
             cfg = config();
-            cfg.gui.sens_start = 0.77;
+            cfg.detektion.sens = 0.77;
             fig = videoauswertung.gui.VideoAnalysisApp(cfg);
             testCase.addTeardown(@() delete(fig(isvalid(fig))));
             felder = findall(fig, 'Type', 'uinumericeditfield');

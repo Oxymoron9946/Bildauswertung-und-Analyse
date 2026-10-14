@@ -4,7 +4,8 @@ function dateien = auswerten_Batch(cfg, basis, rueckmeldung)
 % 1. Kalibriervideo je Messvideo aus dem eigenen Gruppenordner
 %    "Pos_<n>_Kal_<k>" (finde_Kalibrierung).
 % 2. Je Messvideo (cfg.video.dateimuster, außerhalb der Kalibrierordner):
-%    Laborbuchzeile über den Messlauf, Pflichtfelder prüfen, auswerten.
+%    Laborbuchzeile über den Messlauf, Pflichtfelder prüfen, auswerten,
+%    und zwar je Wert in cfg.detektion.sens (Spalte UsedSensitivity).
 %    Fehlt etwas, wird das Video mit Warnung übersprungen.
 % 3. Ergebnisse je Messart als CSV nach cfg.pfade.ausgabe; bei
 %    cfg.plots.batch zusätzlich Verlaufsplots je Einstellung (Unterordner plots).
@@ -93,27 +94,37 @@ function tab = werte_Batchvideo(video, labor, cfg)
 
     try
         kalib = videoauswertung.kern.finde_Kalibrierung(video, cfg);
-        erg = videoauswertung.kern.werte_Video_aus(video, kalib, offset_mm, cfg);
-        bins = erg.bins;
-        n = height(bins);
-        if n > 0
-            meta = table(repmat(m.gas, n, 1), repmat(m.liq, n, 1), repmat(m.pos, n, 1), repmat(m.aufnahme, n, 1), ...
-                repmat(m.material, n, 1), repmat(m.form, n, 1), ...
-                repmat(str2double(m.kanal), n, 1), repmat(str2double(m.nadel), n, 1), ...
-                repmat(reaktor_L, n, 1), repmat(p_Pa, n, 1), repmat(temp_C, n, 1), ...
-                repmat(co2, n, 1), repmat(m.messart, n, 1), repmat(cfg.detektion.sens, n, 1), ...
-                'VariableNames', {'GasVelocity', 'LiquidVelocity', 'CameraPosition', 'Aufnahme', ...
-                'Material', 'Geometrie', 'Kanal_um', 'Nadel_um', 'Reaktor_cm', ...
-                'Druck_Pa_Auslass', 'Temperatur_C', 'CO2_Anteil', 'Messart', 'UsedSensitivity'});
-            bins = [meta, bins];
-            bins.Properties.RowNames = {};
+        teile = cell(numel(cfg.detektion.sens), 1);
+        for k = 1:numel(cfg.detektion.sens)
+            lauf = cfg;
+            lauf.detektion.sens = cfg.detektion.sens(k);
+            erg = videoauswertung.kern.werte_Video_aus(video, kalib, offset_mm, lauf);
+            teile{k} = mit_Metadaten(erg.bins, m, reaktor_L, p_Pa, temp_C, co2, lauf.detektion.sens);
         end
-        tab = bins;
+        teile = teile(~cellfun(@isempty, teile));
+        if ~isempty(teile)
+            tab = vertcat(teile{:});
+        end
     catch ME
         warning('Fehler bei Video %s: %s', m.name, ME.message);
     end
 end
 
+function bins = mit_Metadaten(bins, m, reaktor_L, p_Pa, temp_C, co2, sens)
+    n = height(bins);
+    if n > 0
+        meta = table(repmat(m.gas, n, 1), repmat(m.liq, n, 1), repmat(m.pos, n, 1), repmat(m.aufnahme, n, 1), ...
+            repmat(m.material, n, 1), repmat(m.form, n, 1), ...
+            repmat(str2double(m.kanal), n, 1), repmat(str2double(m.nadel), n, 1), ...
+            repmat(reaktor_L, n, 1), repmat(p_Pa, n, 1), repmat(temp_C, n, 1), ...
+            repmat(co2, n, 1), repmat(m.messart, n, 1), repmat(sens, n, 1), ...
+            'VariableNames', {'GasVelocity', 'LiquidVelocity', 'CameraPosition', 'Aufnahme', ...
+            'Material', 'Geometrie', 'Kanal_um', 'Nadel_um', 'Reaktor_cm', ...
+            'Druck_Pa_Auslass', 'Temperatur_C', 'CO2_Anteil', 'Messart', 'UsedSensitivity'});
+        bins = [meta, bins];
+        bins.Properties.RowNames = {};
+    end
+end
 
 function videos = messvideos(basis, cfg)
     alle = dir(fullfile(basis, '**', cfg.video.dateimuster));

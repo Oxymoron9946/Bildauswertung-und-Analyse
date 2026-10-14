@@ -10,7 +10,7 @@ function erzeuge_Baseline(zielDir, datensaetze, einzelVideos, messdaten)
 % zielDir : Zielordner
 % datensaetze : cellstr der Messordner relativ zu cfg.pfade.messdaten (Batch)
 % einzelVideos : cellstr der Messvideos relativ zu cfg.pfade.messdaten
-%                (Einzelauswertung mit dem GUI-Startwert cfg.gui.sens_start)
+%                (Einzelauswertung mit cfg.detektion.sens)
 % messdaten : optional, Ordner der Messreihen (Standard: cfg.pfade.messdaten),
 %             z. B. für Läufe aus einem git-Worktree ohne Videos
 %
@@ -45,7 +45,7 @@ function erzeuge_Baseline(zielDir, datensaetze, einzelVideos, messdaten)
         lauf = cfg;
         lauf.pfade.ausgabe = fullfile(zielDir, 'gui_einzel');
         t0 = tic;
-        videoauswertung.kern.auswerten_Einzel(lauf, fullfile(cfg.pfade.messdaten, einzelVideos{k}), cfg.gui.sens_start);
+        videoauswertung.kern.auswerten_Einzel(lauf, fullfile(cfg.pfade.messdaten, einzelVideos{k}));
         fprintf('Dauer: %.1f min\n', toc(t0) / 60);
     end
 end
