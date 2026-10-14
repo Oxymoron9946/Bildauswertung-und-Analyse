@@ -73,25 +73,13 @@ function tab = werte_Batchvideo(video, kalibDatei, labor, cfg)
         return;
     end
 
-    zeile = find(strcmp(string(labor.Dateiname), m.name));
-    if isempty(zeile)
-        warning('ÜBERSPRUNGEN: Ordner "%s" wurde im Laborbuch (Spalte "Dateiname") nicht gefunden!', m.name);
+    try
+        z = videoauswertung.kern.lies_Laborbuchzeile(labor, m);
+    catch ME
+        warning('ÜBERSPRUNGEN: %s', ME.message);
         return;
     end
-    zeile = zeile(1);
-    p_Pa      = labor.Umgebungsdruck(zeile);
-    temp_C    = labor.Umgebungstemperatur(zeile);
-    co2       = labor.("CO2-Anteil")(zeile);
-    reaktor_L = labor.Kanallaenge(zeile);
-    offset_mm = labor.Offset(zeile);
-    pflicht = {p_Pa, 'Umgebungsdruck'; temp_C, 'Umgebungstemperatur'; co2, 'CO2-Anteil'; ...
-               reaktor_L, 'Kanallaenge'; offset_mm, 'Offset'};
-    for k = 1:size(pflicht, 1)
-        if ismissing(pflicht{k, 1}) || isnan(pflicht{k, 1})
-            warning('ÜBERSPRUNGEN: Im Laborbuch fehlt "%s" für den Ordner "%s"!', pflicht{k, 2}, m.name);
-            return;
-        end
-    end
+    p_Pa = z.p_Pa; temp_C = z.temp_C; co2 = z.co2; reaktor_L = z.reaktor_cm; offset_mm = z.offset_mm;
 
     try
         if ~isKey(kalibDatei, m.gruppe)

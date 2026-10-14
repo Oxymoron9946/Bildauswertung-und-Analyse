@@ -4,8 +4,8 @@ function [datei, rohdaten, tabelle] = auswerten_Einzel(cfg, video, sensListe, ru
 % Kalibriervideo: erstes Video in einem Kalibrierordner unterhalb des
 % Ordners der Kalibriergruppe "Pos_<n>_Kal_<k>" im Videopfad.
 % Bildrate: aus "<fps>fps" im Pfad, sonst cfg.video.fps.
-% Offset: aus dem Laborbuch; fehlt der Eintrag, gilt cfg.physik.kanalstart_mm
-% (Befund F11: ohne Fehlermeldung).
+% Offset: aus dem Laborbuch; fehlt der Messlauf oder eine Pflichtangabe,
+% bricht die Auswertung mit einer Meldung ab (wie im Batch).
 %
 % Parameter
 % ---------
@@ -41,15 +41,9 @@ function [datei, rohdaten, tabelle] = auswerten_Einzel(cfg, video, sensListe, ru
     end
 
     labor = videoauswertung.io.lade_Laborbuch(cfg.pfade.laborbuch);
-    zeile = find(strcmp(string(labor.Dateiname), m.name));
-    offset_mm = cfg.physik.kanalstart_mm;
-    if ~isempty(zeile) && ~ismissing(labor.Offset(zeile(1))) && ~isnan(labor.Offset(zeile(1)))
-        offset_mm = labor.Offset(zeile(1));
-        fprintf('Offset aus Laborbuch für "%s": %.1f mm.\n', m.name, offset_mm);
-    else
-        fprintf('Kein Laborbuch-Eintrag für "%s" gefunden – nutze Config-Fallback (Offset = %.1f mm).\n', ...
-            m.name, offset_mm);
-    end
+    z = videoauswertung.kern.lies_Laborbuchzeile(labor, m);
+    offset_mm = z.offset_mm;
+    fprintf('Offset aus Laborbuch für "%s": %.1f mm.\n', m.name, offset_mm);
 
     teile = cell(numel(sensListe), 1);
     rohdaten = [];
