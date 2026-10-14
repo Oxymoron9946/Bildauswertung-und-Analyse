@@ -1,6 +1,7 @@
 function erg = werte_Video_aus(video, kalibVideo, kanalstart_mm, cfg, rueckmeldung)
 % WERTE_VIDEO_AUS Wertet ein Messvideo vollständig aus.
 %
+% Bildrate: aus "<fps>fps" im Videopfad, sonst cfg.video.fps.
 % Kalibrierung aus dem ersten Frame des Kalibriervideos, danach je Frame
 % Detektion (erkenne_Blasen) und Zuordnung (verfolge_Blasen), am Ende
 % Geschwindigkeiten, Längen und Bins (berechne_Physik).
@@ -78,8 +79,12 @@ function erg = werte_Video_aus(video, kalibVideo, kanalstart_mm, cfg, rueckmeldu
 
     %% Physik
     m = videoauswertung.kern.lies_Messlauf(video);
+    fps = cfg.video.fps;
+    if ~isnan(m.fps)
+        fps = m.fps;
+    end
     L_ein_mm = videoauswertung.kern.einlauflaenge(m, cfg);
-    [rohdaten, bins] = videoauswertung.kern.berechne_Physik(verlauf, px2mm, cfg.video.fps, ...
+    [rohdaten, bins] = videoauswertung.kern.berechne_Physik(verlauf, px2mm, fps, ...
         imgW, kanalstart_mm, L_ein_mm, cfg);
 
     erg = struct('rohdaten', rohdaten, 'bins', bins, 'px2mm', px2mm, ...

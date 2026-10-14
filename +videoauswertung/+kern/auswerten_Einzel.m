@@ -2,7 +2,7 @@ function [datei, rohdaten, tabelle] = auswerten_Einzel(cfg, video, sensListe, ru
 % AUSWERTEN_EINZEL Wertet ein Messvideo für eine oder mehrere Sensitivitäten aus.
 %
 % Kalibriervideo: finde_Kalibrierung (eigener Gruppenordner).
-% Bildrate: aus "<fps>fps" im Pfad, sonst cfg.video.fps.
+% Bildrate: aus "<fps>fps" im Videopfad, sonst cfg.video.fps (werte_Video_aus).
 % Offset: aus dem Laborbuch; fehlt der Eintrag, gilt cfg.physik.kanalstart_mm
 % (Befund F11: ohne Fehlermeldung).
 %
@@ -30,11 +30,6 @@ function [datei, rohdaten, tabelle] = auswerten_Einzel(cfg, video, sensListe, ru
     m = videoauswertung.kern.lies_Messlauf(video);
     kalib = videoauswertung.kern.finde_Kalibrierung(video, cfg);
     fprintf('Kalibrierdatei: %s\n', kalib);
-
-    fpsTok = regexp(video, '(\d+)fps', 'tokens');
-    if ~isempty(fpsTok)
-        cfg.video.fps = str2double(fpsTok{end}{1});
-    end
 
     labor = videoauswertung.io.lade_Laborbuch(cfg.pfade.laborbuch);
     zeile = find(strcmp(string(labor.Dateiname), m.name));
