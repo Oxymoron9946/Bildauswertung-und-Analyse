@@ -50,3 +50,9 @@ output/
 *.avi
 *.mp4
 *.csv
+
+# Archiv (Patches, Baseline, verschobene Dateien)
+_archiv/
+
+# Referenzergebnisse des Regressionstests werden versioniert
+!tests/referenz/**/*.csv
