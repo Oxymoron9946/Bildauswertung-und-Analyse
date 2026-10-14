@@ -99,6 +99,10 @@ function tab = werte_Batchvideo(video, labor, cfg)
         end
     end
 
+    if m.messart == "Druckkalibrierung" && ~isnan(cfg.laborbuch.co2_anteil_druck)
+        co2 = cfg.laborbuch.co2_anteil_druck;   % Laborbuch-Korrektur, siehe config.m
+    end
+
     try
         kalib = videoauswertung.kern.finde_Kalibrierung(video, cfg);
         erg = videoauswertung.kern.werte_Video_aus(video, kalib, offset_mm, cfg);

@@ -75,6 +75,11 @@ function cfg = config()
     cfg.tracking.rueckwaerts_px = 2;    % tolerierte Rückwärtsbewegung (Rauschen) [px]
     cfg.tracking.min_frames     = 10;   % Blasen mit weniger Frames werden verworfen
 
+    %% Laborbuch-Korrekturen
+    % Druckkalibrierungen laufen ohne CO2; das Laborbuch trägt dort 0,2 ein.
+    % NaN = Laborbuchwert unverändert übernehmen.
+    cfg.laborbuch.co2_anteil_druck = 0;
+
     %% Physik
     cfg.physik.bin_mm          = 4;     % Bin-Breite [mm]; wird auf ceil(2·L_B)/2 vergrößert, wenn kleiner als L_B
     cfg.physik.v_max_m_s       = 5;     % größte plausible Geschwindigkeit [m/s]
