@@ -93,6 +93,10 @@ function tab = werte_Batchvideo(video, kalibDatei, labor, cfg)
         end
     end
 
+    if m.messart == "Druckkalibrierung" && ~isnan(cfg.laborbuch.co2_anteil_druck)
+        co2 = cfg.laborbuch.co2_anteil_druck;   % Laborbuch-Korrektur, siehe config.m
+    end
+
     try
         if ~isKey(kalibDatei, m.gruppe)
             error('Schlüssel "%s" existiert nicht in der Kalibrier-Map!', m.gruppe);
