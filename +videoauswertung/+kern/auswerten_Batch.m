@@ -1,8 +1,8 @@
 function dateien = auswerten_Batch(cfg, basis, rueckmeldung)
 % AUSWERTEN_BATCH Wertet alle Messvideos unter einem Ordner parallel aus.
 %
-% 1. Kalibrierung je Gruppe "Pos_<n>_Kal_<k>" aus den Kalibrierordnern
-%    (cfg.kalibrierung.ordnermuster).
+% 1. Kalibriervideo je Messvideo aus dem eigenen Gruppenordner
+%    "Pos_<n>_Kal_<k>" (finde_Kalibrierung).
 % 2. Je Messvideo (cfg.video.dateimuster, außerhalb der Kalibrierordner):
 %    Laborbuchzeile über den Messlauf, Pflichtfelder prüfen, auswerten.
 %    Fehlt etwas, wird das Video mit Warnung übersprungen.
@@ -30,7 +30,6 @@ function dateien = auswerten_Batch(cfg, basis, rueckmeldung)
     dateien = {};
 
     labor = videoauswertung.io.lade_Laborbuch(cfg.pfade.laborbuch);
-    [kalibDatei, ~] = kalibrierungen(basis, cfg);
     videos = messvideos(basis, cfg);
     gesamt = numel(videos);
     fprintf('Starte parallele Batch-Auswertung für %d Messvideos...\n', gesamt);
@@ -42,7 +41,7 @@ function dateien = auswerten_Batch(cfg, basis, rueckmeldung)
     ergebnisse = cell(gesamt, 1);
     try
         parfor i = 1:gesamt
-            ergebnisse{i} = werte_Batchvideo(videos{i}, kalibDatei, labor, cfg);
+            ergebnisse{i} = werte_Batchvideo(videos{i}, labor, cfg);
             send(q, 1);
         end
     catch ME
@@ -72,7 +71,7 @@ function melde(zaehler, gesamt, rueckmeldung)
     end
 end
 
-function tab = werte_Batchvideo(video, kalibDatei, labor, cfg)
+function tab = werte_Batchvideo(video, labor, cfg)
     tab = table();
     m = videoauswertung.kern.lies_Messlauf(video);
     if isempty(m.gruppe)
@@ -101,10 +100,8 @@ function tab = werte_Batchvideo(video, kalibDatei, labor, cfg)
     end
 
     try
-        if ~isKey(kalibDatei, m.gruppe)
-            error('Schlüssel "%s" existiert nicht in der Kalibrier-Map!', m.gruppe);
-        end
-        erg = videoauswertung.kern.werte_Video_aus(video, kalibDatei(m.gruppe), offset_mm, cfg);
+        kalib = videoauswertung.kern.finde_Kalibrierung(video, cfg);
+        erg = videoauswertung.kern.werte_Video_aus(video, kalib, offset_mm, cfg);
         bins = erg.bins;
         n = height(bins);
         if n > 0
@@ -125,33 +122,6 @@ function tab = werte_Batchvideo(video, kalibDatei, labor, cfg)
     end
 end
 
-function [kalibDatei, px2mm] = kalibrierungen(basis, cfg)
-    % Je Gruppe gilt das zuletzt gefundene erfolgreich kalibrierte Video
-    % (Befund F01: gleiche Gruppe in mehreren Teilordnern wird überschrieben).
-    kalibDatei = containers.Map('KeyType', 'char', 'ValueType', 'char');
-    px2mm = containers.Map('KeyType', 'char', 'ValueType', 'double');
-    fprintf('\n--- Lese Kalibrierungen ein ---\n');
-    liste = dir(fullfile(basis, '**', cfg.kalibrierung.ordnermuster, '*.avi'));
-    for c = 1:numel(liste)
-        tok = regexp(liste(c).folder, '(Pos_\d+_Kal_\d+)', 'tokens');
-        if isempty(tok)
-            continue;
-        end
-        gruppe = tok{1}{1};
-        datei = fullfile(liste(c).folder, liste(c).name);
-        frame = readFrame(VideoReader(datei));
-        if ndims(frame) == 3
-            frame = rgb2gray(frame);
-        end
-        [s, ok] = videoauswertung.kern.kalibriere_Massstab(frame, cfg);
-        if ok
-            px2mm(gruppe) = s;
-            kalibDatei(gruppe) = datei;
-            fprintf('Gruppe %s: %.5f mm/px\n', gruppe, s);
-        end
-    end
-    fprintf('--------------------------------\n\n');
-end
 
 function videos = messvideos(basis, cfg)
     alle = dir(fullfile(basis, '**', cfg.video.dateimuster));
