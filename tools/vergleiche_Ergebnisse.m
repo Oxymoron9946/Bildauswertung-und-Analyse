@@ -1,4 +1,4 @@
-function bericht = vergleiche_Ergebnisse(vorherDir, nachherDir, berichtDatei)
+function bericht = vergleiche_Ergebnisse(vorherDir, nachherDir, berichtDatei, ohneSchluessel)
 % VERGLEICHE_ERGEBNISSE Vorher/Nachher-Vergleich zweier Ergebnisordner.
 %
 % Für jede CSV in vorherDir wird die entsprechende Datei in nachherDir
@@ -12,11 +12,17 @@ function bericht = vergleiche_Ergebnisse(vorherDir, nachherDir, berichtDatei)
 % ---------
 % vorherDir, nachherDir : Ergebnisordner (z. B. _archiv/baseline_0cf713b)
 % berichtDatei : optional, Markdown-Datei für den Bericht
+% ohneSchluessel : optional, cellstr von Schlüsselspalten, die für den
+%                  Abgleich ignoriert werden (z. B. {'UsedSensitivity'},
+%                  wenn sich gerade diese Größe ändert)
 %
 % Rückgabe
 % --------
 % bericht : table, eine Zeile je Datei und Größe
 
+    if nargin < 4
+        ohneSchluessel = {};
+    end
     groessen = {'mean_BubbleLength_mm', 'mean_UnitCellLength_mm', 'mean_SlugLength_mm', ...
         'mean_VoidFraction', 'mean_Speed_m_s', 'GroupCount'};
     dateien = dir(fullfile(vorherDir, '**', '*.csv'));
@@ -35,6 +41,7 @@ function bericht = vergleiche_Ergebnisse(vorherDir, nachherDir, berichtDatei)
         schluessel = intersect(intersect({'GasVelocity', 'LiquidVelocity', 'CameraPosition', 'Material', ...
             'Geometrie', 'Kanal_um', 'Nadel_um', 'Messart', 'Aufnahme', 'UsedSensitivity'}, ...
             A.Properties.VariableNames, 'stable'), B.Properties.VariableNames, 'stable');
+        schluessel = setdiff(schluessel, ohneSchluessel, 'stable');
         A.schluessel = video_Schluessel(A, schluessel);
         B.schluessel = video_Schluessel(B, schluessel);
 
