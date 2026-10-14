@@ -4,8 +4,8 @@ function [rohdaten, bins] = berechne_Physik(verlauf, px2mm, fps, imgW, kanalstar
 % Schritte
 % --------
 % 1. Je Blase (mindestens cfg.tracking.min_frames Frames): v = -dx/dt
-%    zwischen aufeinanderfolgenden Frames, Längen als Mittel beider Frames,
-%    Position = Mittelwert der x-Positionen minus halbe Blasenlänge.
+%    zwischen aufeinanderfolgenden Frames, Längen und Position (Mitte der
+%    gemessenen Blase) als Mittel beider Frames.
 %    Nur 0 < v < cfg.physik.v_max_m_s.
 % 2. Position im Reaktor: kanalstart_mm + Abstand vom rechten Bildrand.
 %    Punkte vor der Einlauflänge L_ein_mm werden verworfen.
@@ -17,7 +17,7 @@ function [rohdaten, bins] = berechne_Physik(verlauf, px2mm, fps, imgW, kanalstar
 %
 % Parameter
 % ---------
-% verlauf : [K x 5] [ID, Frame, x_px, Blasenlänge_px, UC-Länge_px]
+% verlauf : [K x 6] [ID, Frame, x_px, Blasenlänge_px, UC-Länge_px, x_Blase_px]
 % px2mm : Maßstab [mm/px]
 % fps : Bildrate [1/s]
 % imgW : Bildbreite [px]
@@ -33,7 +33,7 @@ function [rohdaten, bins] = berechne_Physik(verlauf, px2mm, fps, imgW, kanalstar
 % bins : table je Bin (grpstats: mean_/std_/numel_ je Größe, GroupCount);
 %        UserData: validStart, validEnd, firstMeas [mm]
 
-    if isempty(verlauf) || size(verlauf, 2) < 5
+    if isempty(verlauf) || size(verlauf, 2) < 6
         rohdaten = table();
         bins = table();
         return;
@@ -92,13 +92,13 @@ function [ids, x_px, v, L_B, L_UC, L_S, eps_v] = je_Blase(verlauf, px2mm, fps, c
         x      = spur(:, 3);
         lb     = spur(:, 4);
         luc    = spur(:, 5);
+        xb     = spur(:, 6);
 
         % Geschwindigkeit zwischen zwei Frames; Minus, weil x stromab abnimmt
         v_m_s = ((-diff(x) * px2mm) ./ (diff(frames) / fps)) / 1000;
-        mitte_x  = (x(1:end-1) + x(2:end)) / 2;
+        mitte_x  = (xb(1:end-1) + xb(2:end)) / 2;
         mitte_lb = (lb(1:end-1) + lb(2:end)) / 2;
         mitte_uc = (luc(1:end-1) + luc(2:end)) / 2;
-        mitte_x  = mitte_x - (mitte_lb / 2);   % siehe Befund F02
 
         ok = (v_m_s > 0) & (v_m_s < cfg.physik.v_max_m_s);
         if sum(ok) == 0

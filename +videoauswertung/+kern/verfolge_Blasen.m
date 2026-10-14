@@ -9,9 +9,9 @@ function [verlauf, vorher, naechsteID] = verfolge_Blasen(blasen, vorher, verlauf
 %
 % Parameter
 % ---------
-% blasen : [N x 3] aus erkenne_Blasen ([x_px, Blasenlänge_px, UC-Länge_px])
+% blasen : [N x 4] aus erkenne_Blasen ([x_px, Blasenlänge_px, UC-Länge_px, x_Blase_px])
 % vorher : [M x 2] [ID, x_px] des Vorframes
-% verlauf : [K x 5] bisheriges Protokoll [ID, Frame, x_px, Blasenlänge_px, UC-Länge_px]
+% verlauf : [K x 6] bisheriges Protokoll [ID, Frame, x_px, Blasenlänge_px, UC-Länge_px, x_Blase_px]
 % naechsteID : nächste freie ID
 % frame : Framenummer (Zeitstempel)
 % cfg : struct aus config()
@@ -43,7 +43,7 @@ function [verlauf, vorher, naechsteID] = verfolge_Blasen(blasen, vorher, verlauf
             id = naechsteID;
             naechsteID = naechsteID + 1;
         end
-        verlauf = [verlauf; id, frame, x, blasen(c, 2), blasen(c, 3)]; %#ok<AGROW>
+        verlauf = [verlauf; id, frame, x, blasen(c, 2), blasen(c, 3), blasen(c, 4)]; %#ok<AGROW>
         neu = [neu; id, x]; %#ok<AGROW>
     end
     vorher = neu;

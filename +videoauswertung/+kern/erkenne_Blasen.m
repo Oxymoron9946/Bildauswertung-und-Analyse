@@ -19,7 +19,8 @@ function [blasen, kanal, det, uc_px, B_vorher, B_nachher, seeds] = erkenne_Blase
 %
 % Rückgabe
 % --------
-% blasen : [N x 3] [x_px (Blasenmitte), Blasenlänge_px, Unit-Cell-Länge_px]
+% blasen : [N x 4] [x_px (Mitte der stromauf liegenden Blase, für das Tracking),
+%          Blasenlänge_px, Unit-Cell-Länge_px, x_px (Mitte der gemessenen Blase)]
 % kanal : aktualisierter Kanalzustand (u. a. heightEstimate [px], Randkurven)
 % det : struct-Array der Blasen (cx, leftX, leftY, rightX, rightY, bb) [px]
 % uc_px : [N x 1] Unit-Cell-Längen [px]
@@ -702,8 +703,10 @@ function [det, seeds] = blasen_auf_Mittellinie(B, y_mid, seeds, imgW, imgH, cfg)
 end
 
 function [blasen, uc_px] = unit_cells(det, imgW, cfg)
-    % Unit-Cell j: linke Kante Blase j bis linke Kante Blase j+1.
-    % Hinweis (Befund F02): Position = Mitte von Blase j, Länge = Blase j+1.
+    % det ist von rechts (stromauf) nach links sortiert. Unit-Cell j reicht
+    % von der Nase (linke Kante) der Blase j+1 bis zur Nase der Blase j:
+    % Blase j+1 plus der Slug dahinter. Gemessen werden Länge und Mitte
+    % der Blase j+1; verfolgt wird weiterhin die Mitte der Blase j.
     blasen = [];
     uc_px = [];
     rand = cfg.detektion.randabstand_px;
@@ -716,7 +719,7 @@ function [blasen, uc_px] = unit_cells(det, imgW, cfg)
         uc_len_px = abs(det(j).leftX - det(j+1).leftX);
         blasen_len_px = det(j+1).rightX - det(j+1).leftX;
         if blasen_len_px > 0 && uc_len_px > blasen_len_px
-            blasen = [blasen; det(j).cx, blasen_len_px, uc_len_px]; %#ok<AGROW>
+            blasen = [blasen; det(j).cx, blasen_len_px, uc_len_px, det(j+1).cx]; %#ok<AGROW>
             uc_px = [uc_px; uc_len_px]; %#ok<AGROW>
         end
     end
