@@ -43,7 +43,8 @@ function cfg = config()
     cfg.kalibrierung.raster_toleranz_rel = 0.25;   % zulässige Abweichung vom Median-Abstand
 
     %% Detektion (je Frame)
-    cfg.detektion.sens            = 0.95;   % Sensitivität adaptthresh [0..1]; höher = mehr Vordergrund
+    cfg.detektion.sens            = 0.95;   % Sensitivität adaptthresh [0..1]; höher = mehr Vordergrund.
+                                            % Ein Vektor (z. B. 0.85:0.05:0.95) wertet jedes Video je Wert aus.
     cfg.detektion.clahe_kacheln   = [4 8];  % adapthisteq NumTiles
     cfg.detektion.clahe_clip      = 0.01;   % adapthisteq ClipLimit
     cfg.detektion.median_px       = [3 3];  % Medianfilter [px]
@@ -106,8 +107,6 @@ function cfg = config()
     cfg.anzeige.jedes_n_frame = 10;
     cfg.anzeige.kalibrierung  = false;   % Kalibrierkontrolle anzeigen
 
-    %% GUI-Startwerte
-    cfg.gui.sens_start = 0.85;
-    cfg.gui.sens_ende  = 0.95;
-    cfg.gui.sens_schritt = 0.05;
+    %% GUI (Startwert der Sensitivität: cfg.detektion.sens)
+    cfg.gui.sens_schritt = 0.05;     % Schrittweite des Sensitivitäts-Sweeps im Batch
 end

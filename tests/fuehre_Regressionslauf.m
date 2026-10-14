@@ -20,8 +20,7 @@ function T = fuehre_Regressionslauf(art, ziel, ausgabe)
         case 'einzel'
             video = dir(fullfile(ziel, cfg.video.dateimuster));
             assert(isscalar(video), 'Im Aufnahmeordner muss genau ein Video liegen: %s', ziel);
-            dateien = {videoauswertung.kern.auswerten_Einzel(cfg, fullfile(video.folder, video.name), ...
-                cfg.gui.sens_start)};
+            dateien = {videoauswertung.kern.auswerten_Einzel(cfg, fullfile(video.folder, video.name))};
         otherwise
             error('Unbekannte Art: %s', art);
     end

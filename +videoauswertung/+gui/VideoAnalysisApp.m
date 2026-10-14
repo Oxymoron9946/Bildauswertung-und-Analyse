@@ -31,9 +31,9 @@ function fig = VideoAnalysisApp(cfg)
     uibutton(panel, 'Position', [220 105 90 22], 'Text', 'Auswählen…', 'ButtonPushedFcn', @auswaehlen);
 
     uilabel(panel, 'Position', [340 200 100 22], 'Text', 'Sens. Start:');
-    sensStart = uieditfield(panel, 'numeric', 'Position', [420 200 80 22], 'Value', cfg.gui.sens_start);
+    sensStart = uieditfield(panel, 'numeric', 'Position', [420 200 80 22], 'Value', cfg.detektion.sens(1));
     uilabel(panel, 'Position', [340 160 100 22], 'Text', 'Sens. Ende:');
-    sensEnde = uieditfield(panel, 'numeric', 'Position', [420 160 80 22], 'Value', cfg.gui.sens_ende, 'Enable', 'off');
+    sensEnde = uieditfield(panel, 'numeric', 'Position', [420 160 80 22], 'Value', cfg.detektion.sens(end), 'Enable', 'off');
 
     uilabel(panel, 'Position', [340 80 150 22], 'Text', 'Jedes N-te Frame zeigen:');
     nFeld = uieditfield(panel, 'numeric', 'Position', [500 80 60 22], 'Value', cfg.anzeige.jedes_n_frame);
@@ -121,6 +121,9 @@ function fig = VideoAnalysisApp(cfg)
                     videoauswertung.plots.zeige_Ergebnisse(rohdaten, [], achse);
                 end
             else
+                sweep = sensStart.Value:cfg.gui.sens_schritt:sensEnde.Value;
+                if isempty(sweep), sweep = sensStart.Value; end
+                lauf.detektion.sens = sweep;
                 rueck.fortschritt = fortschrittsbalken(achse);
                 videoauswertung.kern.auswerten_Batch(lauf, ziel, rueck);
                 cla(achse); axis(achse, 'on');
