@@ -1,8 +1,7 @@
 function [datei, rohdaten, tabelle] = auswerten_Einzel(cfg, video, sensListe, rueckmeldung)
 % AUSWERTEN_EINZEL Wertet ein Messvideo für eine oder mehrere Sensitivitäten aus.
 %
-% Kalibriervideo: erstes Video in einem Kalibrierordner unterhalb des
-% Ordners der Kalibriergruppe "Pos_<n>_Kal_<k>" im Videopfad.
+% Kalibriervideo: finde_Kalibrierung (eigener Gruppenordner).
 % Bildrate: aus "<fps>fps" im Pfad, sonst cfg.video.fps.
 % Offset: aus dem Laborbuch; fehlt der Eintrag, gilt cfg.physik.kanalstart_mm
 % (Befund F11: ohne Fehlermeldung).
@@ -29,11 +28,8 @@ function [datei, rohdaten, tabelle] = auswerten_Einzel(cfg, video, sensListe, ru
     videoauswertung.kern.pruefe_Config(cfg);
     video = char(video);
     m = videoauswertung.kern.lies_Messlauf(video);
-    if isempty(m.gruppe)
-        error('videoauswertung:keineGruppe', ...
-            'Video-Pfad enthält kein "Pos_X_Kal_Y"-Token. Kalibriersuche nicht möglich.');
-    end
-    kalib = suche_Kalibrierung(video, m.gruppe, cfg);
+    kalib = videoauswertung.kern.finde_Kalibrierung(video, cfg);
+    fprintf('Kalibrierdatei: %s\n', kalib);
 
     fpsTok = regexp(video, '(\d+)fps', 'tokens');
     if ~isempty(fpsTok)
@@ -80,29 +76,3 @@ function [datei, rohdaten, tabelle] = auswerten_Einzel(cfg, video, sensListe, ru
     datei = videoauswertung.io.exportiere_Einzel(tabelle, m, cfg.pfade.ausgabe);
 end
 
-function kalib = suche_Kalibrierung(video, gruppe, cfg)
-    % Pfad bis zum Gruppenordner kürzen, darunter das erste Kalibriervideo
-    basis = video;
-    gefunden = false;
-    while true
-        [eltern, ordner, ~] = fileparts(basis);
-        if strcmp(ordner, gruppe)
-            basis = fullfile(eltern, ordner);
-            gefunden = true;
-            break;
-        end
-        if isempty(eltern) || strcmp(eltern, basis)
-            break;
-        end
-        basis = eltern;
-    end
-    if ~gefunden
-        error('videoauswertung:keineGruppe', 'Der Ordnername "%s" wurde nicht im Videopfad gefunden.', gruppe);
-    end
-    liste = dir(fullfile(basis, '**', cfg.kalibrierung.ordnermuster, '*.avi'));
-    if isempty(liste)
-        error('videoauswertung:keineKalibrierung', 'Kalibrierdatei für Gruppe "%s" nicht gefunden.', gruppe);
-    end
-    kalib = fullfile(liste(1).folder, liste(1).name);
-    fprintf('Kalibrierdatei gefunden: %s\n', kalib);
-end
