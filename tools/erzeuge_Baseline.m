@@ -1,4 +1,4 @@
-function erzeuge_Baseline(zielDir, datensaetze, einzelVideos)
+function erzeuge_Baseline(zielDir, datensaetze, einzelVideos, messdaten)
 % ERZEUGE_BASELINE Wertet alle Messordner aus und legt die Ergebnisse ab.
 %
 % Dient dem Vollvergleich mit der Baseline des Ausgangsstands
@@ -11,6 +11,8 @@ function erzeuge_Baseline(zielDir, datensaetze, einzelVideos)
 % datensaetze : cellstr der Messordner relativ zu cfg.pfade.messdaten (Batch)
 % einzelVideos : cellstr der Messvideos relativ zu cfg.pfade.messdaten
 %                (Einzelauswertung mit dem GUI-Startwert cfg.gui.sens_start)
+% messdaten : optional, Ordner der Messreihen (Standard: cfg.pfade.messdaten),
+%             z. B. für Läufe aus einem git-Worktree ohne Videos
 %
 % Aufruf (aus dem Projektordner):
 %   matlab -batch "addpath tools; erzeuge_Baseline('_archiv/neu', {'PVC_1500_1150'}, {})"
@@ -26,6 +28,9 @@ function erzeuge_Baseline(zielDir, datensaetze, einzelVideos)
     fprintf('Baseline für Commit %s, MATLAB %s\n', strtrim(commit), version);
 
     cfg = config();
+    if nargin >= 4 && ~isempty(messdaten)
+        cfg.pfade.messdaten = messdaten;
+    end
     for k = 1:numel(datensaetze)
         fprintf('\n===== Batch: %s =====\n', datensaetze{k});
         lauf = cfg;
