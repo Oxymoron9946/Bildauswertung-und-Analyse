@@ -40,11 +40,11 @@ codegen/
 *.sbproj.bak
 
 # Video and data output directories
-Glaskanal/
-PTFE_1000_600/
-PVC_1000_600/
-PVC_1500_1150/
-output/
+/Glaskanal/
+/PTFE_1000_600/
+/PVC_1000_600/
+/PVC_1500_1150/
+/output/
 
 # Video and CSV files
 *.avi
