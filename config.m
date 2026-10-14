@@ -85,7 +85,6 @@ function cfg = config()
     cfg.physik.v_max_m_s       = 5;     % größte plausible Geschwindigkeit [m/s]
     cfg.physik.plateau_rel     = [0.20 0.80]; % Referenzbereich der Bins für das Plateau
     cfg.physik.plateau_schwelle = 0.50; % Bin gilt, wenn Anzahl >= Schwelle · Median
-    cfg.physik.kanalstart_mm   = 0;     % Ersatz-Offset, falls kein Laborbuch verwendet wird [mm]
 
     %% Einlauflänge L_ein = faktor · Re · d_h (Blasen davor werden verworfen)
     cfg.einlauf.rho_kg_m3 = 1000;    % Dichte der kontinuierlichen Phase (Wasser)
