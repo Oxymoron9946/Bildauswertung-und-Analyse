@@ -1,8 +1,10 @@
 function dateien = exportiere_Batch(ergebnisse, ausgabe)
-% EXPORTIERE_BATCH Schreibt die Batch-Ergebnisse je Messart als CSV (Semikolon).
+% EXPORTIERE_BATCH Schreibt die Batch-Ergebnisse als CSV (Semikolon), eine Datei je Setup.
 %
-% Ausgabeordner: <ausgabe>/Output_PressureCalibration bzw. Output_MassTransfer.
-% Dateiname aus der ersten Zeile je Messart (Befund F08).
+% Setup = Messart, Material, Geometrie, Kanal_um, Reaktor_cm, CO2_Anteil,
+% Nadel_um. Der Dateiname nennt genau diese Werte, z. B.
+%   Output_MassTransfer/Auswertung_Masse_PTFE_R_1000um_72cm_20molCO2_600um.csv
+% (vorher eine Datei je Messart, benannt nach der ersten Zeile, Befund F08).
 %
 % Parameter
 % ---------
@@ -21,9 +23,15 @@ function dateien = exportiere_Batch(ergebnisse, ausgabe)
     end
     alle = vertcat(ergebnisse{gueltig});
 
-    for art = unique(alle.Messart)'
-        teil = alle(string(alle.Messart) == string(art), :);
-        if string(art) == "Druckkalibrierung"
+    setup = {'Messart', 'Material', 'Geometrie', 'Kanal_um', 'Reaktor_cm', 'CO2_Anteil', 'Nadel_um'};
+    schluessel = strings(height(alle), 1);
+    for c = setup
+        schluessel = schluessel + "|" + string(alle.(c{1}));   % Text, damit NaN eine Gruppe bildet
+    end
+    [~, ~, gruppe] = unique(schluessel, 'stable');
+    for g = 1:max(gruppe)
+        teil = alle(gruppe == g, :);
+        if string(teil.Messart(1)) == "Druckkalibrierung"
             ordner = fullfile(ausgabe, 'Output_PressureCalibration');
             praefix = 'Auswertung_Druck';
         else
