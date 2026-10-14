@@ -6,7 +6,8 @@ function dateien = auswerten_Batch(cfg, basis, rueckmeldung)
 % 2. Je Messvideo (cfg.video.dateimuster, außerhalb der Kalibrierordner):
 %    Laborbuchzeile über den Messlauf, Pflichtfelder prüfen, auswerten.
 %    Fehlt etwas, wird das Video mit Warnung übersprungen.
-% 3. Ergebnisse je Messart als CSV nach cfg.pfade.ausgabe.
+% 3. Ergebnisse je Messart als CSV nach cfg.pfade.ausgabe; bei
+%    cfg.plots.batch zusätzlich Verlaufsplots je Einstellung (Unterordner plots).
 %
 % Parameter
 % ---------
@@ -54,6 +55,12 @@ function dateien = auswerten_Batch(cfg, basis, rueckmeldung)
     fprintf('\nAuswertung aller Videos abgeschlossen!\n');
 
     dateien = videoauswertung.io.exportiere_Batch(ergebnisse, cfg.pfade.ausgabe);
+    if cfg.plots.batch
+        stil = videoauswertung.plots.PlotStil(cfg);
+        for k = 1:numel(dateien)
+            videoauswertung.plots.erzeuge_Batchplots(dateien{k}, stil);
+        end
+    end
 end
 
 function melde(zaehler, gesamt, rueckmeldung)

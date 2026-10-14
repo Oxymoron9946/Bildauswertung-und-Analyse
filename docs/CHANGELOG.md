@@ -43,6 +43,15 @@ Beleg steht. Geprüft wird das durch `tests/test_Regression.m`.
   „Kalibrierung“ statt in einem Fenster, das sich nach 5 s schließt.
   Startwerte aus `config.m` (`cfg.gui`, `cfg.anzeige`).
 - Batch per Skript: Fortschritt in der Konsole statt Waitbar-Fenster.
+- Plots neu (P13–P17): eine Funktion je Plot in `+plots`
+  (`plot_Geschwindigkeit_Laenge`, `plot_Laenge_Position`, `plot_Profil`,
+  `plot_Verlauf`), gemeinsamer `PlotStil` (Größe in cm, Sprache de/en,
+  Formate PNG/PDF, dpi, immer helles Theme). Die Batch-Verlaufsplots
+  (vorher `generate_Batch_Plots`, nie aufgerufen) entstehen nach jedem
+  Batch im Unterordner `plots` (`cfg.plots.batch`). Mehrere Aufnahmen
+  desselben Messpunkts werden als getrennte Linien gezeichnet.
+- GUI-Tab „Ergebnisse“ (vorher Platzhalter): zeigt die Plots des letzten
+  Laufs, nach einem Batch die Verlaufsplots je Einstellung.
 - `run_Einzel.m` ersetzt `scripts/run_Single.m` und verhält sich wie die
   GUI-Einzelauswertung: Kalibriervideo und Offset aus Ordnerstruktur und
   Laborbuch, Bildrate aus dem Pfad. Vorher galten feste Pfade, Offset 0 mm

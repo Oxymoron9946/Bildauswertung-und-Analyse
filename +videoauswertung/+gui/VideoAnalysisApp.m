@@ -56,7 +56,13 @@ function fig = VideoAnalysisApp(cfg)
     tabKalib = uitab(tabs, 'Title', 'Kalibrierung');
     kalibAchse = uiaxes(tabKalib, 'Position', [10 10 960 470]);
     tabErgebnis = uitab(tabs, 'Title', 'Ergebnisse');
-    uilabel(tabErgebnis, 'Position', [400 250 300 22], 'Text', 'Ergebnisanzeige folgt.', 'FontSize', 14);
+    uilabel(tabErgebnis, 'Position', [10 455 90 22], 'Text', 'Darstellung:');
+    auswahl = uidropdown(tabErgebnis, 'Position', [100 455 600 22], 'Items', {'(noch keine Ergebnisse)'}, ...
+        'ValueChangedFcn', @(~, ~) zeichneErgebnis());
+    ergebnisAchse = uiaxes(tabErgebnis, 'Position', [10 10 960 435]);
+    stil = videoauswertung.plots.PlotStil(cfg);
+    letztes = struct('art', '', 'rohdaten', [], 'bins', [], 'batch', table(), ...
+        'eintraege', struct('plot', {}, 'sel', {}));
 
     %% Callbacks
     function modusGewechselt(~, event)
@@ -116,14 +122,16 @@ function fig = VideoAnalysisApp(cfg)
         drawnow;
         try
             if strcmp(bg.SelectedObject.Tag, 'single')
-                [~, rohdaten] = videoauswertung.kern.auswerten_Einzel(lauf, ziel, sensStart.Value, rueck);
+                [~, rohdaten, bins] = videoauswertung.kern.auswerten_Einzel(lauf, ziel, sensStart.Value, rueck);
                 if ~isempty(rohdaten)
-                    videoauswertung.plots.zeige_Ergebnisse(rohdaten, [], achse);
+                    videoauswertung.plots.plot_Laenge_Position(rohdaten, stil, achse);
+                    zeigeErgebnisse('einzel', rohdaten, bins, {});
                 end
             else
                 rueck.fortschritt = fortschrittsbalken(achse);
-                videoauswertung.kern.auswerten_Batch(lauf, ziel, rueck);
+                dateien = videoauswertung.kern.auswerten_Batch(lauf, ziel, rueck);
                 cla(achse); axis(achse, 'on');
+                zeigeErgebnisse('batch', [], [], dateien);
             end
             status.Text = 'Fertig.';
         catch ME
@@ -136,6 +144,69 @@ function fig = VideoAnalysisApp(cfg)
 
     function zeigeKalibrierung(frame, info, px2mm, ok)
         videoauswertung.plots.zeige_Kalibrierung(kalibAchse, frame, info, px2mm, ok);
+    end
+
+    function zeigeErgebnisse(art, rohdaten, bins, dateien)
+        % Auswahlliste der Ergebnisplots füllen und den ersten zeichnen
+        letztes.art = art;
+        letztes.rohdaten = rohdaten;
+        letztes.bins = bins;
+        % Jeder Eintrag merkt sich Plotart und (im Batch) die Zeilenauswahl
+        if strcmp(art, 'einzel')
+            texte = {stil.text('titel_LB_x'), stil.text('titel_profil'), stil.text('titel_v_LB')};
+            letztes.eintraege = struct('plot', {'LB_x', 'profil', 'v_LB'}, 'sel', []);
+        else
+            letztes.batch = videoauswertung.plots.lies_Batchergebnis(dateien);
+            [texte, letztes.eintraege] = batch_Eintraege(letztes.batch, stil);
+        end
+        if isempty(texte)
+            auswahl.Items = {'(keine Ergebnisse)'};
+            auswahl.ItemsData = 0;
+            return;
+        end
+        auswahl.Items = texte;
+        auswahl.ItemsData = 1:numel(texte);
+        auswahl.Value = 1;
+        zeichneErgebnis();
+        tabs.SelectedTab = tabErgebnis;
+    end
+
+    function zeichneErgebnis()
+        k = auswahl.Value;
+        if isempty(k) || k == 0
+            return;
+        end
+        e = letztes.eintraege(k);
+        switch e.plot
+            case 'LB_x'
+                videoauswertung.plots.plot_Laenge_Position(letztes.rohdaten, stil, ergebnisAchse);
+            case 'profil'
+                videoauswertung.plots.plot_Profil(letztes.bins, stil, ergebnisAchse);
+            case 'v_LB'
+                videoauswertung.plots.plot_Geschwindigkeit_Laenge(letztes.rohdaten, stil, ergebnisAchse);
+            otherwise
+                videoauswertung.plots.plot_Verlauf(letztes.batch(e.sel, :), e.plot, stil, ergebnisAchse);
+        end
+    end
+end
+
+function [texte, eintraege] = batch_Eintraege(tab, stil)
+    % Je Einstellung (Messart, Material, Form, Kanal, Gas, Flüssigkeit) zwei
+    % Einträge: Geschwindigkeits- und Blasenlängenverlauf
+    texte = {};
+    eintraege = struct('plot', {}, 'sel', {});
+    spalten = {'Messart', 'Material', 'Geometrie', 'Kanal_um', 'GasVelocity', 'LiquidVelocity'};
+    kombis = unique(tab(:, spalten), 'rows');
+    for i = 1:height(kombis)
+        k = kombis(i, :);
+        sel = tab.Messart == k.Messart & tab.Material == k.Material & tab.Geometrie == k.Geometrie & ...
+              tab.Kanal_um == k.Kanal_um & tab.GasVelocity == k.GasVelocity & tab.LiquidVelocity == k.LiquidVelocity;
+        for g = {'Speed_m_s', 'titel_verlauf_v'; 'BubbleLength_mm', 'titel_verlauf_LB'}'
+            texte{end+1} = sprintf('%s – %s %s %s %d µm – %s %s m/s, %s %s m/s', stil.text(g{2}), ... %#ok<AGROW>
+                k.Messart, k.Material, k.Geometrie, k.Kanal_um, stil.text('gas'), k.GasVelocity, ...
+                stil.text('fluessig'), k.LiquidVelocity);
+            eintraege(end+1) = struct('plot', g{1}, 'sel', sel); %#ok<AGROW>
+        end
     end
 end
 
