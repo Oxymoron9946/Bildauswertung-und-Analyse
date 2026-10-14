@@ -1,75 +1,46 @@
 function erzeuge_Baseline(zielDir, datensaetze, einzelVideos)
-% ERZEUGE_BASELINE Friert die Ausgaben des aktuellen Stands als Referenz ein.
+% ERZEUGE_BASELINE Wertet alle Messordner aus und legt die Ergebnisse ab.
 %
-% Ruft den Batch-Ablauf (runBatchPipeline) je Messordner und den
-% Einzelvideo-Ablauf der GUI (start_AnalysisFromGUI, Modus 'single') ohne
-% Bedienoberfläche auf und verschiebt die erzeugten CSV-Dateien nach zielDir.
+% Dient dem Vollvergleich mit der Baseline des Ausgangsstands
+% (_archiv/baseline_0cf713b, erzeugt mit dem Stand archiv/vor-uebergabe).
+% Ablage: <zielDir>/batch/<Messordner>/... und <zielDir>/gui_einzel/...
 %
-% Eingaben:
-%   zielDir      - Zielordner, z. B. _archiv/baseline_<commit>
-%   datensaetze  - cellstr der Messordner relativ zum Projekt (Batch-Ablauf)
-%   einzelVideos - cellstr der Messvideos relativ zum Projekt (GUI-Einzelablauf)
+% Parameter
+% ---------
+% zielDir : Zielordner
+% datensaetze : cellstr der Messordner relativ zu cfg.pfade.messdaten (Batch)
+% einzelVideos : cellstr der Messvideos relativ zu cfg.pfade.messdaten
+%                (Einzelauswertung mit dem GUI-Startwert cfg.gui.sens_start)
 %
 % Aufruf (aus dem Projektordner):
-%   matlab -batch "addpath tools; erzeuge_Baseline('_archiv/baseline_0cf713b', {'PVC_1500_1150'}, {})"
+%   matlab -batch "addpath tools; erzeuge_Baseline('_archiv/neu', {'PVC_1500_1150'}, {})"
 
-    projectRoot = fileparts(fileparts(mfilename('fullpath')));
-    addpath(fullfile(projectRoot, 'src', 'core'));
-    addpath(fullfile(projectRoot, 'src', 'io'));
-    addpath(fullfile(projectRoot, 'src', 'utils'));
-    addpath(fullfile(projectRoot, 'src', 'config'));
-
+    projekt = fileparts(fileparts(mfilename('fullpath')));
+    addpath(projekt);
     if ~isfolder(zielDir)
         mkdir(zielDir);
     end
-    outputDir = fullfile(projectRoot, 'output');
-    if isfolder(outputDir) && ~isempty(setdiff({dir(outputDir).name}, {'.', '..'}))
-        error('output/ ist nicht leer. Bitte vorher nach _archiv/ verschieben.');
-    end
-
-    diary(fullfile(zielDir, sprintf('protokoll_%s.txt', datestr(now, 'yyyymmdd_HHMMSS')))); %#ok<TNOW1,DATST>
-    cleanupDiary = onCleanup(@() diary('off'));
-    [~, commit] = system('git rev-parse HEAD');
+    diary(fullfile(zielDir, sprintf('protokoll_%s.txt', char(datetime('now', 'Format', 'yyyyMMdd_HHmmss')))));
+    aufraeumen = onCleanup(@() diary('off'));
+    [~, commit] = system(sprintf('git -C "%s" rev-parse HEAD', projekt));
     fprintf('Baseline für Commit %s, MATLAB %s\n', strtrim(commit), version);
 
-    config = defaultConfig(projectRoot);
-    config = validateConfig(config);
-    config.ui.showVisuals          = false;
-    config.ui.showCalibrationImage = false;
-    config.ui.exportImages         = false;
-
-    % --- Batch-Ablauf je Messordner ---
+    cfg = config();
     for k = 1:numel(datensaetze)
-        ds = datensaetze{k};
-        fprintf('\n===== Batch: %s =====\n', ds);
+        fprintf('\n===== Batch: %s =====\n', datensaetze{k});
+        lauf = cfg;
+        lauf.pfade.ausgabe = fullfile(zielDir, 'batch', datensaetze{k});
         t0 = tic;
-        runBatchPipeline(config, fullfile(projectRoot, ds));
-        fprintf('Dauer %s: %.1f min\n', ds, toc(t0) / 60);
-        verschiebe(outputDir, fullfile(zielDir, 'batch', ds));
+        videoauswertung.kern.auswerten_Batch(lauf, datensaetze{k});
+        fprintf('Dauer %s: %.1f min\n', datensaetze{k}, toc(t0) / 60);
     end
 
-    % --- GUI-Einzelablauf mit den GUI-Startwerten (Sens. 0,85) ---
     for k = 1:numel(einzelVideos)
-        vid = fullfile(projectRoot, einzelVideos{k});
-        fprintf('\n===== GUI-Einzel: %s =====\n', einzelVideos{k});
-        cfg = config;
-        cfg.detection.sensArray = 0.85;
+        fprintf('\n===== Einzel: %s =====\n', einzelVideos{k});
+        lauf = cfg;
+        lauf.pfade.ausgabe = fullfile(zielDir, 'gui_einzel');
         t0 = tic;
-        start_AnalysisFromGUI('single', cfg, vid);
+        videoauswertung.kern.auswerten_Einzel(lauf, fullfile(cfg.pfade.messdaten, einzelVideos{k}), cfg.gui.sens_start);
         fprintf('Dauer: %.1f min\n', toc(t0) / 60);
     end
-    if ~isempty(einzelVideos)
-        verschiebe(outputDir, fullfile(zielDir, 'gui_einzel'));
-    end
-end
-
-function verschiebe(outputDir, ziel)
-    if ~isfolder(outputDir)
-        warning('Keine Ausgabe erzeugt (%s fehlt).', outputDir);
-        return;
-    end
-    if ~isfolder(fileparts(ziel))
-        mkdir(fileparts(ziel));
-    end
-    movefile(outputDir, ziel);
 end

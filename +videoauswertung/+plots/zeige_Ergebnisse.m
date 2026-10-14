@@ -1,4 +1,4 @@
-function visualize_Results(resultsTable, statsTable, targetAxes)
+function zeige_Ergebnisse(resultsTable, statsTable, targetAxes)
 % VISUALIZE_RESULTS Erstellt Diagramme zur Analyse von Blasenlaenge und Geschwindigkeit.
 % Wenn targetAxes übergeben wird, wird nur der Längenabnahme-Plot dort hineingezeichnet.
 % Ansonsten werden wie bisher separate figure()-Fenster geöffnet.

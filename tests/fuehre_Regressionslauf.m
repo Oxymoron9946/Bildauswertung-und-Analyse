@@ -10,55 +10,23 @@ function T = fuehre_Regressionslauf(art, ziel, ausgabe)
 % Rückgabe
 % --------
 % T : Ergebnistabelle, gelesen aus der erzeugten CSV (alle Spalten als Text)
-%
-% Stand: alter Code (0cf713b). Die Funktionen schreiben fest nach
-% <projekt>/output; ein vorhandener Ordner wird für die Dauer des Laufs
-% beiseitegelegt und danach wiederhergestellt.
 
     cfg = config();
-    projekt = cfg.pfade.projekt;
-    addpath(fullfile(projekt, 'src', 'core'), fullfile(projekt, 'src', 'io'), ...
-        fullfile(projekt, 'src', 'utils'), fullfile(projekt, 'src', 'config'));
-
-    alt = defaultConfig(projekt);
-    alt.ui.showVisuals          = false;
-    alt.ui.showCalibrationImage = false;
-    alt.ui.exportImages         = false;
-
-    outDir = fullfile(projekt, 'output');
-    parkplatz = '';
-    if isfolder(outDir)
-        parkplatz = [outDir '_vor_regressionstest_' char(java.util.UUID.randomUUID)];
-        movefile(outDir, parkplatz);
-    end
-    aufraeumen = onCleanup(@() stelle_wieder_her(outDir, parkplatz, ausgabe));
+    cfg.pfade.ausgabe = ausgabe;
 
     switch art
         case 'batch'
-            runBatchPipeline(alt, ziel);
+            dateien = videoauswertung.kern.auswerten_Batch(cfg, ziel);
         case 'einzel'
             video = dir(fullfile(ziel, cfg.video.dateimuster));
             assert(isscalar(video), 'Im Aufnahmeordner muss genau ein Video liegen: %s', ziel);
-            alt.detection.sensArray = cfg.gui.sens_start;
-            start_AnalysisFromGUI('single', alt, fullfile(video.folder, video.name));
+            dateien = {videoauswertung.kern.auswerten_Einzel(cfg, fullfile(video.folder, video.name), ...
+                cfg.gui.sens_start)};
         otherwise
             error('Unbekannte Art: %s', art);
     end
 
-    csv = dir(fullfile(outDir, '**', '*.csv'));
-    assert(isscalar(csv), 'Erwartet genau eine Ergebnis-CSV, gefunden: %d', numel(csv));
-    datei = fullfile(csv.folder, csv.name);
-    opts = detectImportOptions(datei, 'TextType', 'string', 'VariableNamingRule', 'preserve');
-    T = readtable(datei, setvartype(opts, 'string'));
-end
-
-function stelle_wieder_her(outDir, parkplatz, ausgabe)
-    if isfolder(outDir)
-        if ~isfolder(ausgabe), mkdir(ausgabe); end
-        movefile(fullfile(outDir, '*'), ausgabe);
-        rmdir(outDir, 's');
-    end
-    if ~isempty(parkplatz)
-        movefile(parkplatz, outDir);
-    end
+    assert(isscalar(dateien), 'Erwartet genau eine Ergebnis-CSV, erhalten: %d', numel(dateien));
+    opts = detectImportOptions(dateien{1}, 'TextType', 'string', 'VariableNamingRule', 'preserve');
+    T = readtable(dateien{1}, setvartype(opts, 'string'));
 end

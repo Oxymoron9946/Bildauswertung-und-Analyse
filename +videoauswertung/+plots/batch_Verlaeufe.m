@@ -1,4 +1,4 @@
-function generate_Batch_Plots(MasterTableResults, MasterTableStats, plotsDir)
+function batch_Verlaeufe(MasterTableResults, MasterTableStats, plotsDir)
 % GENERATEBATCHPLOTS Erstellt automatische Visualisierungen gruppiert nach Gas/Liq und Setup
 
 if ~isfolder(plotsDir)

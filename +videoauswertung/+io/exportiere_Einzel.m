@@ -1,0 +1,30 @@
+function datei = exportiere_Einzel(tabelle, m, ausgabe)
+% EXPORTIERE_EINZEL Schreibt das Ergebnis einer Einzelauswertung als CSV (Komma).
+%
+% Datei: <ausgabe>/Output_PressureCalibration/Analysis_Pressure_<Messlauf>.csv
+%    bzw. <ausgabe>/Output_MassTransfer/Analysis_Mass_<Messlauf>.csv
+%
+% Parameter
+% ---------
+% tabelle : Bins mit Spalte UsedSensitivity
+% m : struct aus lies_Messlauf
+% ausgabe : Ausgabeordner (cfg.pfade.ausgabe)
+%
+% Rückgabe
+% --------
+% datei : Pfad der geschriebenen Datei
+
+    if m.messart == "Druckkalibrierung"
+        ordner = fullfile(ausgabe, 'Output_PressureCalibration');
+        praefix = 'Analysis_Pressure_';
+    else
+        ordner = fullfile(ausgabe, 'Output_MassTransfer');
+        praefix = 'Analysis_Mass_';
+    end
+    if ~isfolder(ordner)
+        mkdir(ordner);
+    end
+    datei = fullfile(ordner, sprintf('%s%s.csv', praefix, m.name));
+    writetable(tabelle, datei);
+    fprintf('Gesamtergebnis gespeichert unter: %s\n', datei);
+end
