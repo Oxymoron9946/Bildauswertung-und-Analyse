@@ -60,6 +60,10 @@ Funktion: `videoauswertung.kern.erkenne_Blasen`
    Eine Unit-Cell reicht von der Nase einer Blase bis zur Nase der
    stromauf folgenden Blase; sie umfasst also eine Blase und den Slug
    dahinter.
+7. **Optional: Fragmente verbinden** (`detektion.fragmente_verbinden`,
+   Standard aus). Ein Schein-Slug, der kürzer ist als 0,7 × die typische
+   Slug-Länge des Frames, gilt als Reflexion; die beiden Blasenteile
+   werden verbunden. Siehe Kapitel 8 zur Wirkung.
 
 Die Abbildungen Abb1 bis Abb9 (`abbildungen.exportieren = true`) zeigen
 diese Schritte für ein Frame.
@@ -89,9 +93,13 @@ sind Mittelwerte beider Frames:
 - Blasenlänge L_B, Unit-Cell-Länge L_UC, Slug-Länge L_S = L_UC − L_B
 - Längenanteil der Blase ε = L_B / L_UC (Spalte `VoidFraction`; ein
   Längen-, kein Volumenverhältnis)
-- Position im Reaktor x = Offset + (Bildbreite − x_px) · s
+- Position im Reaktor x = Offset + (Bildbreite − x_px) · s, mit x_px der
+  Mitte der gemessenen Blase
 
-<!-- F02: Bezugspunkt der Position nach Freigabe eintragen -->
+Geschwindigkeit und Position gehören zu benachbarten Blasen derselben
+Unit-Cell: verfolgt wird die stromauf liegende Blase, gemessen (Länge,
+Position) die stromab liegende. Da alle Blasen einer Unit-Cell-Kette mit
+derselben Geschwindigkeit laufen, ist das gleichwertig.
 
 Messpunkte vor der hydrodynamischen Einlauflänge werden verworfen:
 
