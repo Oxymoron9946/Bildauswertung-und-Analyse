@@ -17,6 +17,7 @@ function fig = VideoAnalysisApp(cfg)
         cfg = config();
     end
     fig = uifigure('Name', 'Videoauswertung', 'Position', [100 50 1000 800]);
+    theme(fig, 'light');   % Plots wie im Export, unabhängig vom MATLAB-Design
     fig.UserData.CancelRequested = false;
 
     %% Bedienfeld

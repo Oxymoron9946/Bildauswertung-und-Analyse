@@ -13,11 +13,15 @@ Dauerhafte Änderungen direkt in `config.m` vornehmen. Jeder Lauf speichert
 seine vollständigen Einstellungen in `output/lauf_config_<Zeit>.json`
 (Kapitel 6.4).
 
-**Spalten der Tabellen:** *Herkunft* nennt, woher der Wert stammt
-(„Ausgangsstand“ = im Code von `0cf713b` fest eingetragen, unverändert
-übernommen). *Wirkung* beschreibt, was eine Änderung bewirkt. Quantitativ
-untersucht ist nur die Sensitivität (Abschnitt 3.4); bei allen anderen
-Werten gilt: vor einer Änderung mit dem Regressionssatz vergleichen
+**Herkunft der Werte:** Alle Zahlenwerte stammen aus dem Ausgangsstand
+`0cf713b`, wo sie fest im Code standen, und wurden unverändert übernommen.
+Ausnahmen: `laborbuch.co2_anteil_druck` (Fix F06), die
+`fragment_*`-Einträge (lokaler Patch, Fix F07, Standard aus) und die
+Plot- und Anzeigeeinstellungen (neu).
+
+**Wirkung** beschreibt, was eine Änderung bewirkt. Quantitativ untersucht
+ist nur die Sensitivität (Abschnitt 3.4); bei allen anderen Werten gilt:
+vor einer Änderung mit dem Regressionssatz vergleichen
 (`tools/vergleiche_Ergebnisse.m`).
 
 ## 3.1 Pfade (`cfg.pfade`)
@@ -32,81 +36,83 @@ Werten gilt: vor einer Änderung mit dem Regressionssatz vergleichen
 
 Alle Pfade sind absolut; der aktuelle MATLAB-Ordner spielt keine Rolle.
 
-## 3.2 Video und Kalibrierung
+## 3.2 Video und Kalibrierung (`cfg.video`, `cfg.kalibrierung`)
 
-| Eintrag | Bedeutung | Einheit | Standard | Herkunft | Wirkung |
-|---|---|---|---|---|---|
-| `video.dateimuster` | Dateiname der Kamera-AVIs | – | `XSM-3520 Camera 0330_*.avi` | Ausgangsstand | andere Kamera → anpassen |
-| `video.fps` | Bildrate, falls der Pfad kein `<n>fps` enthält | 1/s | 200 | Ausgangsstand | skaliert alle Geschwindigkeiten linear |
-| `kalibrierung.ordnermuster` | Name der Kalibrierordner | – | `Kalibrierung_*` | Ausgangsstand | – |
-| `kalibrierung.rasterweite_mm` | Abstand zweier Linealstriche | mm | 0,525 | Ausgangsstand (Lineal) | skaliert alle Längen und Geschwindigkeiten linear |
-| `kalibrierung.suchbereich_rel` | vertikaler Suchstreifen für das Lineal | Anteil Bildhöhe | [0,30 0,80] | Ausgangsstand | Lineal muss darin liegen |
-| `kalibrierung.band_oben_px`, `band_unten_px` | Band um die Linealzeile | px | 60, 15 | Ausgangsstand | gering |
-| `kalibrierung.rand_px` | ignorierter Bildrand | px | 25 | Ausgangsstand | gering |
-| `kalibrierung.glaettung_px` | Glättung des Helligkeitsprofils | px | 5 | Ausgangsstand | zu groß: Striche verschmelzen |
-| `kalibrierung.prominenz_rel` | Mindesthöhe eines Strichs | Anteil Maximum | 0,10 | Ausgangsstand | zu groß: Striche fehlen |
-| `kalibrierung.min_strichabstand_px` | Mindestabstand zweier Striche | px | 8 | Ausgangsstand | muss kleiner als der Strichabstand im Bild (≈ 9,6 px) sein |
-| `kalibrierung.min_striche` | Mindestanzahl Striche | – | 10 | Ausgangsstand | darunter gilt die Kalibrierung als fehlgeschlagen |
-| `kalibrierung.raster_toleranz_rel` | zulässige Abweichung vom Median-Strichabstand | – | 0,25 | Ausgangsstand | gering |
+Einträge ohne Präfix gehören zu `cfg.kalibrierung`.
+
+| Eintrag | Bedeutung | Einheit | Standard | Wirkung |
+|---|---|---|---|---|
+| `video.dateimuster` | Dateiname der Kamera-AVIs | – | `XSM-3520 Camera 0330_*.avi` | andere Kamera → anpassen |
+| `video.fps` | Bildrate, falls der Pfad kein `<n>fps` enthält | 1/s | 200 | skaliert alle Geschwindigkeiten linear |
+| `ordnermuster` | Name der Kalibrierordner | – | `Kalibrierung_*` | – |
+| `rasterweite_mm` | Abstand zweier Linealstriche | mm | 0,525 | skaliert alle Längen und Geschwindigkeiten linear |
+| `suchbereich_rel` | vertikaler Suchstreifen für das Lineal | Anteil Bildhöhe | [0,30 0,80] | Lineal muss darin liegen |
+| `band_oben_px`, `band_unten_px` | Band um die Linealzeile | px | 60, 15 | gering |
+| `rand_px` | ignorierter Bildrand | px | 25 | gering |
+| `glaettung_px` | Glättung des Helligkeitsprofils | px | 5 | zu groß: Striche verschmelzen |
+| `prominenz_rel` | Mindesthöhe eines Strichs | Anteil Maximum | 0,10 | zu groß: Striche fehlen |
+| `min_strichabstand_px` | Mindestabstand zweier Striche | px | 8 | muss kleiner als der Strichabstand im Bild (≈ 9,6 px) sein |
+| `min_striche` | Mindestanzahl Striche | – | 10 | darunter gilt die Kalibrierung als fehlgeschlagen |
+| `raster_toleranz_rel` | zulässige Abweichung vom Median-Strichabstand | – | 0,25 | gering |
 
 ## 3.3 Laborbuch-Korrekturen (`cfg.laborbuch`)
 
-| Eintrag | Bedeutung | Einheit | Standard | Herkunft |
-|---|---|---|---|---|
-| `co2_anteil_druck` | CO₂-Anteil für Druckkalibrierungen, unabhängig vom Laborbuch; `NaN` = Laborbuchwert verwenden | – | 0 | Fix F06 (Druckkalibrierungen laufen ohne CO₂, Laborbuch trägt 0,2 ein) |
+| Eintrag | Bedeutung | Einheit | Standard |
+|---|---|---|---|
+| `co2_anteil_druck` | CO₂-Anteil für Druckkalibrierungen, unabhängig vom Laborbuch; `NaN` = Laborbuchwert verwenden | – | 0 |
 
 ## 3.4 Detektion (`cfg.detektion`)
 
-| Eintrag | Bedeutung | Einheit | Standard | Herkunft | Wirkung |
-|---|---|---|---|---|---|
-| `sens` | Sensitivität der adaptiven Schwelle; Vektor = Sweep | – (0…1) | 0,95 | Ausgangsstand (Batch) | **hoch**: 0,85 statt 0,95 ändert die Mittelwerte je Video um bis zu 6 %, einzelne Bins um bis zu 100 % (Fix F03) |
-| `clahe_kacheln`, `clahe_clip` | Kontrastausgleich (adapthisteq) | – | [4 8], 0,01 | Ausgangsstand | Beleuchtungsabhängig |
-| `median_px` | Medianfilter | px | [3 3] | Ausgangsstand | gering |
-| `close_hoehe_px`, `close_breite_px` | Schließen von Rissen in den Blasen | px | 5, 5 | Ausgangsstand | zu groß: Blasen und Slugs verschmelzen |
-| `staub_px` | kleinste schwarze Störfläche im Slug | px² | 15 | Ausgangsstand | gering |
-| `min_slug_px` | kleinste weiße Slug-Fläche nach dem Füllen | px² | 50 | Ausgangsstand | gering |
-| `min_flaeche_px` | kleinste Objektfläche für die Kanalhöhe | px² | 100 | Ausgangsstand | gering |
-| `band_halb_px` | halbe Breite des Bands um die Mittellinie | px | 2 | Ausgangsstand | mittel: breiter → mehr Störkanten |
-| `strahl_max_px`, `strahl_anteil`, `strahl_min_px` | Suchweite der Kantenklassifizierung | px, –, px | 20, 0,8, 2 | Ausgangsstand | mittel |
-| `abstand_ersatz_px` | Ersatz-Kantenabstand, wenn kein Median bestimmbar | px | 50 | Ausgangsstand | selten wirksam |
-| `min_blase_px` | Blasen bis zu dieser Länge verwerfen | px | 5 | Ausgangsstand | gering |
-| `randabstand_px` | Unit-Cells am Bildrand verwerfen | px | 2 | Ausgangsstand | gering |
-| `fragmente_verbinden` | durch Reflexionen zerteilte Blasen verbinden | – | `false` | Fix F07, zurückgestellt | **hoch**: mit `true` ändern sich 89 von 122 Videos, teils um 20 % (Kapitel 8) |
-| `fragment_schwelle_rel` | Schein-Slug, wenn kürzer als dieser Anteil der typischen Slug-Länge | – | 0,7 | lokaler Patch | nur mit `fragmente_verbinden` |
-| `fragment_min_slugs`, `fragment_klassen` | Mindestanzahl Slugs, Histogrammklassen für die typische Slug-Länge | – | 4, 10 | lokaler Patch | nur mit `fragmente_verbinden` |
+| Eintrag | Bedeutung | Einheit | Standard | Wirkung |
+|---|---|---|---|---|
+| `sens` | Sensitivität der adaptiven Schwelle; Vektor = Sweep | – (0…1) | 0,95 | **hoch**: 0,85 statt 0,95 ändert die Mittelwerte je Video um bis zu 6 %, einzelne Bins um bis zu 100 % (Fix F03) |
+| `clahe_kacheln`, `clahe_clip` | Kontrastausgleich (adapthisteq) | – | [4 8], 0,01 | Beleuchtungsabhängig |
+| `median_px` | Medianfilter | px | [3 3] | gering |
+| `close_hoehe_px`, `close_breite_px` | Schließen von Rissen in den Blasen | px | 5, 5 | zu groß: Blasen und Slugs verschmelzen |
+| `staub_px` | kleinste schwarze Störfläche im Slug | px² | 15 | gering |
+| `min_slug_px` | kleinste weiße Slug-Fläche nach dem Füllen | px² | 50 | gering |
+| `min_flaeche_px` | kleinste Objektfläche für die Kanalhöhe | px² | 100 | gering |
+| `band_halb_px` | halbe Breite des Bands um die Mittellinie | px | 2 | mittel: breiter → mehr Störkanten |
+| `strahl_max_px`, `strahl_anteil`, `strahl_min_px` | Suchweite der Kantenklassifizierung | px, –, px | 20, 0,8, 2 | mittel |
+| `abstand_ersatz_px` | Ersatz-Kantenabstand, wenn kein Median bestimmbar | px | 50 | selten wirksam |
+| `min_blase_px` | Blasen bis zu dieser Länge verwerfen | px | 5 | gering |
+| `randabstand_px` | Unit-Cells am Bildrand verwerfen | px | 2 | gering |
+| `fragmente_verbinden` | durch Reflexionen zerteilte Blasen verbinden | – | `false` | **hoch**: mit `true` ändern sich 89 von 122 Videos, teils um 20 % (Kapitel 8) |
+| `fragment_schwelle_rel` | Schein-Slug, wenn kürzer als dieser Anteil der typischen Slug-Länge | – | 0,7 | nur mit `fragmente_verbinden` |
+| `fragment_min_slugs`, `fragment_klassen` | Mindestanzahl Slugs, Histogrammklassen für die typische Slug-Länge | – | 4, 10 | nur mit `fragmente_verbinden` |
 
 ## 3.5 Kanalmodell (`cfg.kanal`)
 
-| Eintrag | Bedeutung | Einheit | Standard | Herkunft |
-|---|---|---|---|---|
-| `init_frames` | Frames für die Schätzung der Kanalwände | – | 10 | Ausgangsstand |
-| `stuetzabstand_px` | Abstand der Stützstellen | px | 20 | Ausgangsstand |
-| `min_gueltig_rel` | Mindestanteil gültiger Stützstellen je Frame | – | 0,3 | Ausgangsstand |
-| `breite_tol_rel`, `sprung_rel`, `kruemmung_rel`, `streuung_rel` | Schwellen für unplausible Stützstellen (Anteil der Kanalbreite) | – | 0,08, 0,05, 0,03, 0,04 | Ausgangsstand |
-| `min_hoehe_rel` | Mindesthöhe im Ersatzmodell (wenn die Schätzung scheitert) | – | 0,85 | Ausgangsstand |
+| Eintrag | Bedeutung | Einheit | Standard |
+|---|---|---|---|
+| `init_frames` | Frames für die Schätzung der Kanalwände | – | 10 |
+| `stuetzabstand_px` | Abstand der Stützstellen | px | 20 |
+| `min_gueltig_rel` | Mindestanteil gültiger Stützstellen je Frame | – | 0,3 |
+| `breite_tol_rel`, `sprung_rel`, `kruemmung_rel`, `streuung_rel` | Schwellen für unplausible Stützstellen (Anteil der Kanalbreite) | – | 0,08, 0,05, 0,03, 0,04 |
+| `min_hoehe_rel` | Mindesthöhe im Ersatzmodell (wenn die Schätzung scheitert) | – | 0,85 |
 
 Wirkung: nur bei schwierigen Bildern (Spiegelungen an der Wand,
 schwankende Beleuchtung). Prüfen mit der Live-Ansicht (rote Linien).
 
 ## 3.6 Tracking (`cfg.tracking`)
 
-| Eintrag | Bedeutung | Einheit | Standard | Herkunft | Wirkung |
-|---|---|---|---|---|---|
-| `max_sprung_px` | größte Verschiebung je Frame | px | 50 | Ausgangsstand | **begrenzt die messbare Geschwindigkeit** auf ≈ max_sprung_px · s · f (50 px · 0,055 mm/px · 200 1/s ≈ 0,55 m/s) |
-| `rueckwaerts_px` | tolerierte Rückwärtsbewegung | px | 2 | Ausgangsstand | gering |
-| `min_frames` | Mindestanzahl Frames je Blase | – | 10 | Ausgangsstand | mittel: kleiner → mehr, aber unsicherere Messpunkte |
+| Eintrag | Bedeutung | Einheit | Standard | Wirkung |
+|---|---|---|---|---|
+| `max_sprung_px` | größte Verschiebung je Frame | px | 50 | **begrenzt die messbare Geschwindigkeit** auf ≈ max_sprung_px · s · f (50 px · 0,055 mm/px · 200 1/s ≈ 0,55 m/s) |
+| `rueckwaerts_px` | tolerierte Rückwärtsbewegung | px | 2 | gering |
+| `min_frames` | Mindestanzahl Frames je Blase | – | 10 | mittel: kleiner → mehr, aber unsicherere Messpunkte |
 
 ## 3.7 Physik und Einlauflänge (`cfg.physik`, `cfg.einlauf`)
 
-| Eintrag | Bedeutung | Einheit | Standard | Herkunft | Wirkung |
-|---|---|---|---|---|---|
-| `physik.bin_mm` | Bin-Breite (wird auf ceil(2 · L_B)/2 vergrößert, wenn kleiner als L_B) | mm | 4 | Ausgangsstand | bestimmt Anzahl und Glättung der Bins |
-| `physik.v_max_m_s` | größte plausible Geschwindigkeit | m/s | 5 | Ausgangsstand | wirkt praktisch nicht (Tracking begrenzt stärker) |
-| `physik.plateau_rel` | Referenzbereich für die stabile Messzone | Anteil der Bins | [0,20 0,80] | Ausgangsstand | mittel |
-| `physik.plateau_schwelle` | Bin gilt, wenn Anzahl ≥ Schwelle · Median | – | 0,50 | Ausgangsstand | mittel: höher → kürzere Messzone |
-| `einlauf.rho_kg_m3` | Dichte der kontinuierlichen Phase | kg/m³ | 1000 | Ausgangsstand (Wasser) | verschiebt die Einlauflänge |
-| `einlauf.mu_Pa_s` | Viskosität der kontinuierlichen Phase | Pa·s | 0,001 | Ausgangsstand (Wasser) | verschiebt die Einlauflänge |
-| `einlauf.faktor` | L_ein = faktor · Re · d_h | – | 0,05 | Ausgangsstand (laminare Einlauflänge) | verschiebt die Einlauflänge |
+| Eintrag | Bedeutung | Einheit | Standard | Wirkung |
+|---|---|---|---|---|
+| `physik.bin_mm` | Bin-Breite (wird auf ceil(2 · L_B)/2 vergrößert, wenn kleiner als L_B) | mm | 4 | bestimmt Anzahl und Glättung der Bins |
+| `physik.v_max_m_s` | größte plausible Geschwindigkeit | m/s | 5 | wirkt praktisch nicht (Tracking begrenzt stärker) |
+| `physik.plateau_rel` | Referenzbereich für die stabile Messzone | Anteil der Bins | [0,20 0,80] | mittel |
+| `physik.plateau_schwelle` | Bin gilt, wenn Anzahl ≥ Schwelle · Median | – | 0,50 | mittel: höher → kürzere Messzone |
+| `einlauf.rho_kg_m3` | Dichte der kontinuierlichen Phase | kg/m³ | 1000 | verschiebt die Einlauflänge |
+| `einlauf.mu_Pa_s` | Viskosität der kontinuierlichen Phase | Pa·s | 0,001 | verschiebt die Einlauflänge |
+| `einlauf.faktor` | L_ein = faktor · Re · d_h | – | 0,05 | verschiebt die Einlauflänge |
 
 ## 3.8 Ausgabe, Plots, Anzeige, GUI
 

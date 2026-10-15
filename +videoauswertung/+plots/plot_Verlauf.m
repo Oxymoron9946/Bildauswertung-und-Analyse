@@ -47,7 +47,7 @@ function fig = plot_Verlauf(tab, groesse, stil, ax)
         e = tab.(['std_' groesse])(sel);
         name = sprintf('%s %d', stil.text('kameraposition'), linien.pos(k));
         if mehrere
-            name = sprintf('%s (%s)', name, linien.aufnahme(k));
+            name = sprintf('%s (%s)', name, strrep(linien.aufnahme(k), '_', '\_'));   % TeX: _ wörtlich
         end
         errorbar(ax, x, y(i), e(i), 'o-', 'LineWidth', 1.2, 'MarkerSize', 4, 'DisplayName', name);
     end

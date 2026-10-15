@@ -10,13 +10,15 @@ run_Batch.m / run_Einzel.m / Start_App.m      Einstiege, lesen config.m
   auswerten_Batch ──┐                         alle Videos eines Ordners (parfor)
   auswerten_Einzel ─┤                         ein Video, optional Live-Ansicht
                     ▼
-  werte_Video_aus                             ein Video: Kalibrierung, Frames, Physik
-    kalibriere_Massstab                       Lineal → mm/px
-    erkenne_Blasen                            je Frame
-    verfolge_Blasen                           je Frame
-    berechne_Physik                           am Ende
-  lies_Messlauf, finde_Kalibrierung,          Ordnernamen, Laborbuch
-  lies_Laborbuchzeile, einlauflaenge
+  werte_Messvideo                             ein Video mit Metadaten (beide Wege)
+    lies_Messlauf                             Messlauf, Aufnahme, Einstellungen aus dem Pfad
+    finde_Kalibrierung                        Kalibriervideo im Gruppenordner
+    lies_Laborbuchzeile                       Pflichtangaben
+    werte_Video_aus                           je Sensitivität: Kalibrierung, Frames, Physik
+      kalibriere_Massstab                     Lineal → mm/px
+      erkenne_Blasen, verfolge_Blasen         je Frame
+      einlauflaenge, berechne_Physik          am Ende
+  wiederhole_Lauf                             Lauf aus lauf_config_*.json erneut ausführen
         │
         ▼
 +videoauswertung/+io                          Laborbuch lesen, CSV schreiben

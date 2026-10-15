@@ -26,20 +26,46 @@ KOPF = r"""
 \usepackage{etoolbox}
 \AtBeginEnvironment{longtable}{\small}
 \setlength{\emergencystretch}{3em}
+\let\originalunderscore\_
+\renewcommand{\_}{\originalunderscore\allowbreak}
 """
 
 CODE = re.compile(r'(```.*?```|`[^`\n]*`)', re.S)
-LINK = re.compile(r'\[([^\]]+)\]\((?!https?:)[^)]+\)')
+LINK = re.compile(r'(?<!!)\[([^\]]+)\]\((?!https?:)[^)]+\)')   # keine Bilder
 LISTE = re.compile(r'([^\n])\n([ \t]*(?:[-*]|\d+\.)[ \t]+)')
 KOMMENTAR = re.compile(r'<!--.*?-->', re.S)
+BILD = re.compile(r'(!\[[^\]]*\]\()(bilder/[^)]+)\)')
 
 
 def git_stand():
     try:
-        return subprocess.run(['git', '-C', str(PROJEKT), 'describe', '--always', '--dirty'],
+        return subprocess.run(['git', '-C', str(PROJEKT), 'rev-parse', '--short', 'HEAD'],
                               capture_output=True, text=True, check=True).stdout.strip()
     except (OSError, subprocess.CalledProcessError):
         return 'unbekannt'
+
+
+def spaltenbreiten(text):
+    """Trennzeilen von Pipe-Tabellen proportional zum längsten Zellinhalt setzen.
+
+    Pandoc-Markdown nimmt die relative Spaltenbreite aus der Anzahl der
+    Striche in der Trennzeile; |---|---| ergäbe gleich breite Spalten.
+    """
+    zeilen = text.split('\n')
+    i = 0
+    while i < len(zeilen) - 1:
+        if zeilen[i].startswith('|') and re.fullmatch(r'\|(\s*:?-+:?\s*\|)+\s*', zeilen[i + 1]):
+            j = i + 2
+            while j < len(zeilen) and zeilen[j].startswith('|'):
+                j += 1
+            zellen = [[z.strip() for z in zeile.strip().strip('|').split('|')] for k, zeile in enumerate(zeilen[i:j]) if k != 1]
+            n = len(zellen[0])
+            breite = [max(3, min(60, max(len(z[s]) if s < len(z) else 0 for z in zellen))) for s in range(n)]
+            zeilen[i + 1] = '|' + '|'.join('-' * b for b in breite) + '|'
+            i = j
+        else:
+            i += 1
+    return '\n'.join(zeilen)
 
 
 def bereinige(text):
@@ -60,7 +86,10 @@ def bereinige(text):
     t = t.replace('$', '\\$')
     t = LISTE.sub(r'\1\n\n\2', t)
     t = KOMMENTAR.sub('', t)
-    return re.sub('\x00(\\d+)\x00', lambda m: code[int(m.group(1))], t)
+    # XeLaTeX läuft in einem temporären Ordner: Bildpfade absolut machen
+    t = BILD.sub(lambda m: m.group(1) + (DOCS / m.group(2)).as_posix() + ')', t)
+    t = re.sub('\x00(\\d+)\x00', lambda m: code[int(m.group(1))], t)
+    return spaltenbreiten(t)
 
 
 def main():
@@ -87,7 +116,7 @@ def main():
         '-H', str(kopf),
     ]
     try:
-        pypandoc.convert_text(markdown, 'pdf', format='gfm', outputfile=str(ZIEL), extra_args=argumente)
+        pypandoc.convert_text(markdown, 'pdf', format='markdown-yaml_metadata_block', outputfile=str(ZIEL), extra_args=argumente)
     finally:
         kopf.unlink(missing_ok=True)
     print(f'PDF geschrieben: {ZIEL}')

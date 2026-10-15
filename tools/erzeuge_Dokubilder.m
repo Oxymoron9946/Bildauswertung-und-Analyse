@@ -62,7 +62,8 @@ function erzeuge_Dokubilder(batchCsv)
     fig = videoauswertung.gui.VideoAnalysisApp(gui);
     drawnow;
     exportapp(fig, fullfile(ziel, 'gui_einzel.png'));
-    findall(fig, 'Type', 'uieditfield').Value = video;
+    pfad = findall(fig, 'Type', 'uieditfield');
+    pfad.Value = video;
     start = findall(fig, 'Type', 'uibutton', 'Text', 'Start');
     start.ButtonPushedFcn(start, []);
     tabs = findall(fig, 'Type', 'uitabgroup');
@@ -78,7 +79,7 @@ function erzeuge_Dokubilder(batchCsv)
     exportapp(fig, fullfile(ziel, 'gui_batch.png'));
 
     % Echter Batch-Lauf über einen kleinen Messordner, dann Ergebnistab
-    findall(fig, 'Type', 'uieditfield').Value = fullfile(gui.pfade.messdaten, 'PVC_1500_1150');
+    pfad.Value = fullfile(gui.pfade.messdaten, 'PVC_1500_1150');
     start.ButtonPushedFcn(start, []);
     exportapp(fig, fullfile(ziel, 'gui_ergebnisse_batch.png'));
     delete(fig);
