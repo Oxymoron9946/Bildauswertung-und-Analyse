@@ -56,3 +56,7 @@ _archiv/
 
 # Referenzergebnisse des Regressionstests werden versioniert
 !tests/referenz/**/*.csv
+
+# Dokumentations-Build
+.venv-docs/
+docs/__pycache__/

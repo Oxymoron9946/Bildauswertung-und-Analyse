@@ -1,14 +1,12 @@
 function dateien = auswerten_Batch(cfg, basis, rueckmeldung)
 % AUSWERTEN_BATCH Wertet alle Messvideos unter einem Ordner parallel aus.
 %
-% 1. Kalibriervideo je Messvideo aus dem eigenen Gruppenordner
-%    "Pos_<n>_Kal_<k>" (finde_Kalibrierung).
-% 2. Je Messvideo (cfg.video.dateimuster, außerhalb der Kalibrierordner):
-%    Laborbuchzeile über den Messlauf, Pflichtfelder prüfen, auswerten,
-%    und zwar je Wert in cfg.detektion.sens (Spalte UsedSensitivity).
-%    Fehlt etwas, wird das Video mit Warnung übersprungen.
-% 3. Ergebnisse je Messart als CSV nach cfg.pfade.ausgabe; bei
-%    cfg.plots.batch zusätzlich Verlaufsplots je Einstellung (Unterordner plots).
+% Je Messvideo (cfg.video.dateimuster, außerhalb der Kalibrierordner)
+% werte_Messvideo: Laborbuch, Kalibrierung, Auswertung je Wert in
+% cfg.detektion.sens. Fehlt etwas, wird das Video mit Warnung übersprungen.
+% Ergebnis: eine CSV je Setup in cfg.pfade.ausgabe, bei cfg.plots.batch
+% zusätzlich Verlaufsplots je Einstellung (Unterordner plots), dazu
+% lauf_config_<Zeit>.json mit allen Einstellungen des Laufs.
 %
 % Parameter
 % ---------
@@ -33,17 +31,27 @@ function dateien = auswerten_Batch(cfg, basis, rueckmeldung)
     labor = videoauswertung.io.lade_Laborbuch(cfg.pfade.laborbuch);
     videos = messvideos(basis, cfg);
     gesamt = numel(videos);
-    fprintf('Starte parallele Batch-Auswertung für %d Messvideos...\n', gesamt);
-
-    q = parallel.pool.DataQueue;
     zaehler = containers.Map({'fertig'}, {0});   % Handle: zählt im Client mit
-    afterEach(q, @(~) melde(zaehler, gesamt, rueckmeldung));
-
     ergebnisse = cell(gesamt, 1);
     try
-        parfor i = 1:gesamt
-            ergebnisse{i} = werte_Batchvideo(videos{i}, labor, cfg);
-            send(q, 1);
+        if parallel_verfuegbar()
+            fprintf('Starte parallele Batch-Auswertung für %d Messvideos...\n', gesamt);
+            q = parallel.pool.DataQueue;
+            afterEach(q, @(~) melde(zaehler, gesamt, rueckmeldung));
+            parfor i = 1:gesamt
+                ergebnisse{i} = werte_Batchvideo(videos{i}, labor, cfg);
+                send(q, 1);
+            end
+        else
+            % Ohne Parallel Computing Toolbox: nacheinander, gleiche Ergebnisse
+            fprintf('Starte Batch-Auswertung (nacheinander) für %d Messvideos...\n', gesamt);
+            for i = 1:gesamt
+                ergebnisse{i} = werte_Batchvideo(videos{i}, labor, cfg);
+                melde(zaehler, gesamt, rueckmeldung);
+                if isfield(rueckmeldung, 'abbruch') && rueckmeldung.abbruch()
+                    error('videoauswertung:abbruch', 'Abbruch durch Benutzer.');
+                end
+            end
         end
     catch ME
         if isfield(rueckmeldung, 'abbruch') && rueckmeldung.abbruch()
@@ -55,12 +63,18 @@ function dateien = auswerten_Batch(cfg, basis, rueckmeldung)
     fprintf('\nAuswertung aller Videos abgeschlossen!\n');
 
     dateien = videoauswertung.io.exportiere_Batch(ergebnisse, cfg.pfade.ausgabe);
+    videoauswertung.io.schreibe_Laufconfig(cfg, 'batch', basis);
     if cfg.plots.batch
         stil = videoauswertung.plots.PlotStil(cfg);
         for k = 1:numel(dateien)
             videoauswertung.plots.erzeuge_Batchplots(dateien{k}, stil);
         end
     end
+end
+
+function ja = parallel_verfuegbar()
+    % Parallel Computing Toolbox installiert und lizenziert?
+    ja = ~isempty(ver('parallel')) && license('test', 'Distrib_Computing_Toolbox');
 end
 
 function melde(zaehler, gesamt, rueckmeldung)
@@ -73,56 +87,12 @@ function melde(zaehler, gesamt, rueckmeldung)
 end
 
 function tab = werte_Batchvideo(video, labor, cfg)
-    tab = table();
-    m = videoauswertung.kern.lies_Messlauf(video);
-    if isempty(m.gruppe)
-        warning('ÜBERSPRUNGEN: Video hat kein "Pos_X_Kal_Y" im Pfad: %s', video);
-        return;
-    end
-
+    % Fehler eines Videos brechen den Batch nicht ab: Warnung, Video überspringen
     try
-        z = videoauswertung.kern.lies_Laborbuchzeile(labor, m);
+        tab = videoauswertung.kern.werte_Messvideo(video, labor, cfg);
     catch ME
         warning('ÜBERSPRUNGEN: %s', ME.message);
-        return;
-    end
-    p_Pa = z.p_Pa; temp_C = z.temp_C; co2 = z.co2; reaktor_L = z.reaktor_cm; offset_mm = z.offset_mm;
-
-    if m.messart == "Druckkalibrierung" && ~isnan(cfg.laborbuch.co2_anteil_druck)
-        co2 = cfg.laborbuch.co2_anteil_druck;   % Laborbuch-Korrektur, siehe config.m
-    end
-
-    try
-        kalib = videoauswertung.kern.finde_Kalibrierung(video, cfg);
-        teile = cell(numel(cfg.detektion.sens), 1);
-        for k = 1:numel(cfg.detektion.sens)
-            lauf = cfg;
-            lauf.detektion.sens = cfg.detektion.sens(k);
-            erg = videoauswertung.kern.werte_Video_aus(video, kalib, offset_mm, lauf);
-            teile{k} = mit_Metadaten(erg.bins, m, reaktor_L, p_Pa, temp_C, co2, lauf.detektion.sens);
-        end
-        teile = teile(~cellfun(@isempty, teile));
-        if ~isempty(teile)
-            tab = vertcat(teile{:});
-        end
-    catch ME
-        warning('Fehler bei Video %s: %s', m.name, ME.message);
-    end
-end
-
-function bins = mit_Metadaten(bins, m, reaktor_L, p_Pa, temp_C, co2, sens)
-    n = height(bins);
-    if n > 0
-        meta = table(repmat(m.gas, n, 1), repmat(m.liq, n, 1), repmat(m.pos, n, 1), repmat(m.aufnahme, n, 1), ...
-            repmat(m.material, n, 1), repmat(m.form, n, 1), ...
-            repmat(str2double(m.kanal), n, 1), repmat(str2double(m.nadel), n, 1), ...
-            repmat(reaktor_L, n, 1), repmat(p_Pa, n, 1), repmat(temp_C, n, 1), ...
-            repmat(co2, n, 1), repmat(m.messart, n, 1), repmat(sens, n, 1), ...
-            'VariableNames', {'GasVelocity', 'LiquidVelocity', 'CameraPosition', 'Aufnahme', ...
-            'Material', 'Geometrie', 'Kanal_um', 'Nadel_um', 'Reaktor_cm', ...
-            'Druck_Pa_Auslass', 'Temperatur_C', 'CO2_Anteil', 'Messart', 'UsedSensitivity'});
-        bins = [meta, bins];
-        bins.Properties.RowNames = {};
+        tab = table();
     end
 end
 
