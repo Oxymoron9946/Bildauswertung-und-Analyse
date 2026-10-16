@@ -13,16 +13,9 @@ Dauerhafte Änderungen direkt in `config.m` vornehmen. Jeder Lauf speichert
 seine vollständigen Einstellungen in `output/lauf_config_<Zeit>.json`
 (Kapitel 6.4).
 
-**Herkunft der Werte:** Alle Zahlenwerte stammen aus dem Ausgangsstand
-`0cf713b`, wo sie fest im Code standen, und wurden unverändert übernommen.
-Ausnahmen: `laborbuch.co2_anteil_druck` (Fix F06), die
-`fragment_*`-Einträge (lokaler Patch, Fix F07, Standard aus) und die
-Plot- und Anzeigeeinstellungen (neu).
-
-**Wirkung** beschreibt, was eine Änderung bewirkt. Quantitativ untersucht
-ist nur die Sensitivität (Abschnitt 3.4); bei allen anderen Werten gilt:
-vor einer Änderung mit dem Regressionssatz vergleichen
-(`tools/vergleiche_Ergebnisse.m`).
+Die Spalte **Wirkung** beschreibt, was eine Änderung bewirkt. Werte mit
+starker Wirkung sind fett markiert; vor einer Änderung lohnt ein Vergleich
+mit den bisherigen Ergebnissen.
 
 ## 3.1 Pfade (`cfg.pfade`)
 
@@ -32,7 +25,6 @@ vor einer Änderung mit dem Regressionssatz vergleichen
 | `messdaten` | Ordner, unter dem die Messordner liegen | Projektordner |
 | `laborbuch` | Laborbuch-CSV | `data/Laborbuch.csv` |
 | `ausgabe` | Ergebnis-CSV, Plots, Laufdateien | `output/` |
-| `abbildungen` | Methodik-Abbildungen Abb1–9 | `output/abbildungen/` |
 
 Alle Pfade sind absolut; der aktuelle MATLAB-Ordner spielt keine Rolle.
 
@@ -65,7 +57,7 @@ Einträge ohne Präfix gehören zu `cfg.kalibrierung`.
 
 | Eintrag | Bedeutung | Einheit | Standard | Wirkung |
 |---|---|---|---|---|
-| `sens` | Sensitivität der adaptiven Schwelle; Vektor = Sweep | – (0…1) | 0,95 | **hoch**: 0,85 statt 0,95 ändert die Mittelwerte je Video um bis zu 6 %, einzelne Bins um bis zu 100 % (Fix F03) |
+| `sens` | Sensitivität der adaptiven Schwelle; Vektor = Sweep | – (0…1) | 0,95 | **hoch**: 0,85 statt 0,95 ändert die Mittelwerte je Video um bis zu 6 %, einzelne Bins um bis zu 100 % |
 | `clahe_kacheln`, `clahe_clip` | Kontrastausgleich (adapthisteq) | – | [4 8], 0,01 | Beleuchtungsabhängig |
 | `median_px` | Medianfilter | px | [3 3] | gering |
 | `close_hoehe_px`, `close_breite_px` | Schließen von Rissen in den Blasen | px | 5, 5 | zu groß: Blasen und Slugs verschmelzen |
@@ -77,7 +69,7 @@ Einträge ohne Präfix gehören zu `cfg.kalibrierung`.
 | `abstand_ersatz_px` | Ersatz-Kantenabstand, wenn kein Median bestimmbar | px | 50 | selten wirksam |
 | `min_blase_px` | Blasen bis zu dieser Länge verwerfen | px | 5 | gering |
 | `randabstand_px` | Unit-Cells am Bildrand verwerfen | px | 2 | gering |
-| `fragmente_verbinden` | durch Reflexionen zerteilte Blasen verbinden | – | `false` | **hoch**: mit `true` ändern sich 89 von 122 Videos, teils um 20 % (Kapitel 8) |
+| `fragmente_verbinden` | durch Reflexionen zerteilte Blasen verbinden | – | `false` | **hoch**, experimentell: verbindet in manchen Videos auch echte Blasen; Standard aus (Kapitel 8) |
 | `fragment_schwelle_rel` | Schein-Slug, wenn kürzer als dieser Anteil der typischen Slug-Länge | – | 0,7 | nur mit `fragmente_verbinden` |
 | `fragment_min_slugs`, `fragment_klassen` | Mindestanzahl Slugs, Histogrammklassen für die typische Slug-Länge | – | 4, 10 | nur mit `fragmente_verbinden` |
 
@@ -114,14 +106,10 @@ schwankende Beleuchtung). Prüfen mit der Live-Ansicht (rote Linien).
 | `einlauf.mu_Pa_s` | Viskosität der kontinuierlichen Phase | Pa·s | 0,001 | verschiebt die Einlauflänge |
 | `einlauf.faktor` | L_ein = faktor · Re · d_h | – | 0,05 | verschiebt die Einlauflänge |
 
-## 3.8 Ausgabe, Plots, Anzeige, GUI
+## 3.8 Plots, Anzeige, GUI
 
 | Eintrag | Bedeutung | Standard |
 |---|---|---|
-| `abbildungen.exportieren` | Methodik-Abbildungen Abb1–9 eines Frames erzeugen | `false` |
-| `abbildungen.frame` | Frame für die Abbildungen | 15 |
-| `abbildungen.dpi` | Auflösung | 600 |
-| `abbildungen.bemassung_px` | Höhe der Bemaßungslinie über der Blase [px] | 45 |
 | `plots.sprache` | Beschriftung `'de'` oder `'en'` | `'de'` |
 | `plots.breite_cm`, `plots.hoehe_cm` | Plotgröße [cm] | 16, 9 |
 | `plots.formate` | Ausgabeformate | `{'png', 'pdf'}` |

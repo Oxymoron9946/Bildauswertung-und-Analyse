@@ -2,8 +2,7 @@
 
 Die Oberfläche bedient dieselben Funktionen wie die Skripte
 (`videoauswertung.kern.auswerten_Einzel` bzw. `auswerten_Batch`) und
-liefert dieselben Ergebnisse; der Test `tests/test_GuiLauf.m` prüft das
-bytegenau.
+liefert dieselben Ergebnisse.
 
 Start in MATLAB im Projektordner:
 
@@ -22,15 +21,14 @@ Start_App
    (rot), Blasengrenzen (grün/rot) und Blasenlänge in mm.
    **Kalibrierung zeigen** zeichnet das Kontrollbild des Lineals in den Tab
    „Kalibrierung“.
-5. **Start**. Nach dem Lauf wechselt die Oberfläche in den Tab
-   „Ergebnisse“.
+5. **Start**. Während der Auswertung zeigt der Tab „Live-Ansicht“ das
+   aktuelle Bild mit der Erkennung (Kapitel 5.3).
 
 ![Live-Ansicht während der Auswertung](bilder/gui_live.png)
 
-![Ergebnisse nach einem Einzellauf](bilder/gui_ergebnisse_einzel.png)
-
-Über **Darstellung** lassen sich die drei Plots des Einzelvideos
-umschalten (Kapitel 5).
+Nach dem Lauf wechselt die Oberfläche in den Tab „Ergebnisse“. Über
+**Darstellung** lassen sich dort die drei Plots des Einzelvideos
+umschalten (Kapitel 5.2).
 
 ## 6.2 Batch
 
@@ -45,9 +43,7 @@ umschalten (Kapitel 5).
 4. **Start**. Ein Balken zeigt den Fortschritt (Videos fertig / gesamt).
    Live-Ansicht und Kalibrierkontrolle sind im Batch abgeschaltet.
 5. Im Tab „Ergebnisse“ steht je Einstellung der Geschwindigkeits- und
-   Blasenlängenverlauf zur Auswahl.
-
-![Ergebnisse nach einem Batch](bilder/gui_ergebnisse_batch.png)
+   Blasenlängenverlauf zur Auswahl (Kapitel 5.1).
 
 **Stop** bricht den Lauf ab. Im Batch werden dabei die parallelen Worker
 beendet; bereits fertige Videos werden nicht gespeichert. Im Einzelmodus
@@ -83,22 +79,13 @@ videoauswertung.gui.VideoAnalysisApp(cfg);
 
 Jeder Lauf, aus der Oberfläche wie aus einem Skript, schreibt seine
 vollständigen Einstellungen nach `output/lauf_config_<Zeit>.json`
-(Laufart, Ziel, Zeit, Code-Stand und alle `cfg`-Einträge). Wiederholen:
+(Laufart, Ziel, Zeit, Code-Stand und alle `cfg`-Einträge).
 
 ```matlab
-videoauswertung.kern.wiederhole_Lauf('output/lauf_config_20261014_201500.json')
-```
-
-oder mit eigenem Ausgabeordner, um die Ergebnisse zu vergleichen:
-
-```matlab
-videoauswertung.kern.wiederhole_Lauf('output/lauf_config_….json', 'output/wiederholung')
-```
-
-Die Einstellungen lassen sich auch nur laden und weiter verwenden:
-
-```matlab
-[cfg, lauf] = videoauswertung.io.lade_Laufconfig('output/lauf_config_….json');
+datei = 'output/lauf_config_20261014_201500.json';
+videoauswertung.kern.wiederhole_Lauf(datei)                          % Lauf wiederholen
+videoauswertung.kern.wiederhole_Lauf(datei, 'output/wiederholung')   % in eigenen Ordner
+[cfg, lauf] = videoauswertung.io.lade_Laufconfig(datei);             % nur Einstellungen laden
 ```
 
 ## 6.5 Fehlermeldungen

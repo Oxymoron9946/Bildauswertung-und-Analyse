@@ -2,8 +2,8 @@
 
 Alle Plots entstehen über Funktionen in `+videoauswertung/+plots` mit einem
 gemeinsamen Stil (`PlotStil`): Größe in cm, Beschriftung Deutsch oder
-Englisch, PNG und PDF, immer helles Theme. Einstellungen in `cfg.plots`
-(Kapitel 3.8).
+Englisch (`cfg.plots.sprache = 'en'` beschriftet alle Plots englisch), PNG
+und PDF, immer helles Theme. Einstellungen in `cfg.plots` (Kapitel 3.8).
 
 ```matlab
 stil = videoauswertung.plots.PlotStil(config());   % Stil aus config.m
@@ -63,41 +63,29 @@ Aufruf: `plot_Laenge_Position(rohdaten, stil)`.
 **Aussage:** Bin-Mittelwerte von L_B und L_UC mit Standardabweichung, nur
 in der stabilen Messzone. Aufruf: `plot_Profil(bins, stil)`.
 
-![Dasselbe mit englischer Beschriftung (cfg.plots.sprache = 'en')](bilder/plot_profil_en.png)
-
 ![Geschwindigkeit über Blasenlänge](bilder/plot_v_laenge.png)
 
 **Aussage:** Zusammenhang zwischen Blasenlänge und Geschwindigkeit mit
 linearer Anpassung. Aufruf: `plot_Geschwindigkeit_Laenge(rohdaten, stil)`.
 
-## 5.3 Kontrollansichten
+## 5.3 Kontrollansichten für die Fehlersuche
+
+Sehen die Ergebnisse unplausibel aus, zeigen zwei Ansichten, ob Kanal,
+Blasen und Lineal richtig erkannt wurden. Beide sind in der Oberfläche
+zuschaltbar (Kapitel 6) und lassen sich auch im Skript erzeugen.
 
 ![Live-Ansicht: Kanalwände (rot), Blasengrenzen (grün/rot), Blasenlänge in mm](bilder/plot_live.png)
 
-**Live-Ansicht** (`cfg.anzeige.live`): prüft während der Auswertung, ob
-Kanal und Blasen richtig erkannt werden. Aufruf als Rückmeldung:
-`rueck.live = @(I, seeds, det, px2mm, frame) videoauswertung.plots.zeige_Live(ax, I, seeds, det, px2mm, frame)`.
+**Live-Ansicht** (`cfg.anzeige.live`, GUI-Tab „Live-Ansicht“): jedes N-te
+Frame mit den erkannten Kanalwänden (rot), den Blasengrenzen (grün links,
+rot rechts) und der gemessenen Blasenlänge. Liegen die roten Linien nicht
+auf den Kanalwänden oder fehlen Blasen, ist meist die Sensitivität
+(`cfg.detektion.sens`) anzupassen. Im Skript: `run_Einzel`.
 
 ![Kalibrierkontrolle: Suchband (gelb), Linealstriche (rot), Messstrecke (grün)](bilder/plot_kalibrierung.png)
 
-**Kalibrierkontrolle** (`cfg.anzeige.kalibrierung`): prüft, ob das Lineal
-richtig erkannt wurde. Der Titel nennt Maßstab, Messstrecke und Bildlänge.
-
-## 5.4 Methodik-Abbildungen
-
-Mit `cfg.abbildungen.exportieren = true` entstehen für das Frame
-`cfg.abbildungen.frame` die Bilder der einzelnen Verarbeitungsschritte in
-`cfg.pfade.abbildungen` (Kapitel 7):
-
-| Datei | Schritt |
-|---|---|
-| `Abb1_Original.png` | Grauwertbild |
-| `Abb2_Kontrast.png` | nach Kontrastausgleich und Median |
-| `Abb3_Binaer.png` | nach adaptiver Schwelle und Schließen |
-| `Abb5_Kanalgeometrie.png` | Kanalwände (rot) und Mittellinie (cyan) |
-| `Abb6_Raycasting_Kanten.png` | Suchstrahlen (magenta), Blasenkanten (rot), Slugkanten (grün) |
-| `Abb7_RegionGrowing_Maske.png` | Füllmaske mit Saatpunkten (blau) |
-| `Abb8_Gefuellt.png` | gefüllte Blasen |
-| `Abb9_FinaleMessung.png` | Bemaßung jeder Blase in mm |
-
-![Abb9: Bemaßung der erkannten Blasen](bilder/Abb9_FinaleMessung.png)
+**Kalibrierkontrolle** (`cfg.anzeige.kalibrierung`, GUI-Tab
+„Kalibrierung“): das erste Bild des Kalibriervideos mit den erkannten
+Linealstrichen. Der Titel nennt Maßstab, Messstrecke und Bildlänge; ein
+Maßstab deutlich außerhalb von etwa 0,054–0,055 mm/px (bisherige
+Kameraeinstellung) deutet auf eine Fehlerkennung hin.

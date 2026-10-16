@@ -56,17 +56,13 @@ function erg = werte_Video_aus(video, kalibVideo, kanalstart_mm, cfg, rueckmeldu
         frame = frame + 1;
         I = graustufen(readFrame(v));
 
-        [blasen, kanal, det, uc_px, B_vorher, B_nachher, seeds] = ...
+        [blasen, kanal, det, uc_px, seeds] = ...
             videoauswertung.kern.erkenne_Blasen(I, kanal, cfg);
         if ~isempty(uc_px)
             uc_mm = [uc_mm; uc_px * px2mm]; %#ok<AGROW>
         end
         [verlauf, vorher, naechsteID] = videoauswertung.kern.verfolge_Blasen( ...
             blasen, vorher, verlauf, naechsteID, frame, cfg);
-
-        if cfg.abbildungen.exportieren && frame == cfg.abbildungen.frame
-            videoauswertung.plots.exportiere_Methodik(I, B_vorher, B_nachher, seeds, det, px2mm, cfg);
-        end
 
         if zeigeLive && mod(frame, cfg.anzeige.jedes_n_frame) == 0
             rueckmeldung.live(I, seeds, det, px2mm, frame);

@@ -1,13 +1,13 @@
-function [blasen, kanal, det, uc_px, B_vorher, B_nachher, seeds] = erkenne_Blasen(I, kanal, cfg)
+function [blasen, kanal, det, uc_px, seeds] = erkenne_Blasen(I, kanal, cfg)
 % ERKENNE_BLASEN Findet Blasen und Unit-Cells in einem Frame des Taylor-Flows.
 %
 % Ablauf (Strömung von rechts nach links):
-%   1. Kontrast (CLAHE) und Median, adaptive Schwelle, Schließen   -> B_vorher
+%   1. Kontrast (CLAHE) und Median, adaptive Schwelle, Schließen
 %   2. Kanalränder: über cfg.kanal.init_frames Frames geschätzt, danach fest
 %   3. Kanten auf der Mittellinie, je Kante Raycasting-Abstimmung:
 %      Typ 1 = linke Blasenkante, Typ 2 = linke Slugkante
 %   4. Alternanz 1/2/1/2 erzwingen (Störkanten nach Abstandsrhythmus entfernen)
-%   5. Region Growing füllt die Blasen schwarz                       -> B_nachher
+%   5. Region Growing füllt die Blasen schwarz
 %   6. Blasen als schwarze Abschnitte auf der Mittellinie; durch Reflexionen
 %      zerteilte Blasen wieder verbinden; Unit-Cells aus benachbarten Blasen
 %
@@ -24,8 +24,7 @@ function [blasen, kanal, det, uc_px, B_vorher, B_nachher, seeds] = erkenne_Blase
 % kanal : aktualisierter Kanalzustand (u. a. heightEstimate [px], Randkurven)
 % det : struct-Array der Blasen (cx, leftX, leftY, rightX, rightY, bb) [px]
 % uc_px : [N x 1] Unit-Cell-Längen [px]
-% B_vorher, B_nachher : logische Binärbilder vor/nach dem Füllen (Abbildungen)
-% seeds : struct mit Zwischenergebnissen für Live-Ansicht und Abbildungen
+% seeds : struct mit Kanalrändern und Kanten (für die Live-Ansicht)
 
     [imgH, imgW] = size(I);
     kanal = initialisiere_Kanal(kanal, cfg);
@@ -33,9 +32,9 @@ function [blasen, kanal, det, uc_px, B_vorher, B_nachher, seeds] = erkenne_Blase
     uc_px = [];
     det = struct('cx', {}, 'leftX', {}, 'leftY', {}, 'rightX', {}, 'rightY', {}, 'bb', {});
 
-    [I_eq, B_vorher] = binarisiere(I, cfg);
+    B_vorher = binarisiere(I, cfg);
 
-    seeds = struct('slug_cx', [], 'slug_cy', [], 'bub_cx', [], 'bub_cy', [], 'check_lines_x', [], ...
+    seeds = struct('slug_cx', [], 'slug_cy', [], 'bub_cx', [], 'bub_cy', [], ...
                    'top_points_x', [], 'top_points_y', [], 'bot_points_x', [], 'bot_points_y', []);
     [y_top, y_bot, kanal, seeds] = kanalraender(B_vorher, kanal, seeds, imgW, imgH, cfg);
     y_top = max(1, min(imgH, y_top));
@@ -47,9 +46,6 @@ function [blasen, kanal, det, uc_px, B_vorher, B_nachher, seeds] = erkenne_Blase
 
     seeds.slug_cx = []; seeds.slug_cy = [];
     seeds.bub_cx = []; seeds.bub_cy = [];
-    seeds.tie_cx = []; seeds.tie_cy = [];
-    seeds.center_cx = []; seeds.center_cy = [];
-    seeds.ray_x = []; seeds.ray_y0 = []; seeds.ray_y1 = [];
     seeds.mid_line_y = y_mid;
     seeds.y_top_line = y_top;
     seeds.y_bot_line = y_bot;
@@ -57,8 +53,6 @@ function [blasen, kanal, det, uc_px, B_vorher, B_nachher, seeds] = erkenne_Blase
     [kanten, seeds] = klassifiziere_Kanten(B_clean, y_mid, seeds, imgW, imgH, cfg);
     [kanten, seeds] = erzwinge_Alternanz(kanten, seeds, cfg);
     [B_nachher, seeds] = fuelle_Blasen(B_vorher, B_clean, y_mid, kanten, seeds, imgW, cfg);
-    seeds.I_eq = I_eq;
-    seeds.B_clean = B_clean;
 
     [kanal, weiter] = schaetze_Kanalhoehe(B_nachher, kanal, cfg);
     if ~weiter
@@ -77,7 +71,7 @@ end
 
 %% --- Schritt 1: Binarisierung -------------------------------------------
 
-function [I_eq, B] = binarisiere(I, cfg)
+function B = binarisiere(I, cfg)
     % CLAHE gleicht die Ausleuchtung entlang des Kanals an, der Median
     % entfernt Salz-und-Pfeffer-Rauschen an den Blasenkanten.
     I_eq = adapthisteq(I, 'NumTiles', cfg.detektion.clahe_kacheln, 'ClipLimit', cfg.detektion.clahe_clip);
@@ -478,8 +472,6 @@ function [kanten, seeds] = klassifiziere_Kanten(B_clean, y_mid, seeds, imgW, img
             x_R = min(imgW, x_right_start + step);
             [y_up_L, y_down_L] = senkrechter_Strahl(B_clean, x_L, round(y_mid(x_L)), imgH);
             [y_up_R, y_down_R] = senkrechter_Strahl(B_clean, x_R, round(y_mid(x_R)), imgH);
-            seeds.ray_x(end+1) = x_L; seeds.ray_y0(end+1) = y_up_L; seeds.ray_y1(end+1) = y_down_L;
-            seeds.ray_x(end+1) = x_R; seeds.ray_y0(end+1) = y_up_R; seeds.ray_y1(end+1) = y_down_R;
             dist_vert_L = y_down_L - y_up_L;
             dist_vert_R = y_down_R - y_up_R;
             if dist_vert_R < dist_vert_L
@@ -548,8 +540,6 @@ function [kanten, seeds] = erzwinge_Alternanz(kanten, seeds, cfg)
             else
                 kanten(i).type = 1;
             end
-            seeds.tie_cx(end+1) = kanten(i).x;
-            seeds.tie_cy(end+1) = kanten(i).y;
         end
 
         if i < length(kanten) && kanten(i).type == kanten(i+1).type
@@ -572,8 +562,6 @@ function [kanten, seeds] = erzwinge_Alternanz(kanten, seeds, cfg)
             else
                 weg = i + 1;
             end
-            seeds.tie_cx(end+1) = kanten(weg).x;
-            seeds.tie_cy(end+1) = kanten(weg).y;
             kanten(weg) = [];
             % i nicht erhöhen: die nachgerückte Kante erneut prüfen
         else
@@ -644,8 +632,6 @@ function [B_nachher, seeds] = fuelle_Blasen(B_vorher, B_clean, y_mid, ~, seeds, 
     B_nachher = B_vorher & ~gefuellt;
     B_nachher = bwareaopen(B_nachher, cfg.detektion.min_slug_px);
 
-    seeds.Marker = Marker;
-    seeds.Mask = Mask;
 end
 
 %% --- Schritt 6: Kanalhöhe, Blasen, Unit-Cells ---------------------------
@@ -693,8 +679,6 @@ function [det, seeds] = blasen_auf_Mittellinie(B, y_mid, seeds, imgW, imgH, cfg)
             continue;   % Blase berührt den Bildrand
         end
         cx = (leftX + rightX) / 2;
-        seeds.center_cx(end+1) = cx;
-        seeds.center_cy(end+1) = round(y_mid(round(cx)));
         det(end+1) = struct('cx', cx, 'leftX', leftX, 'leftY', round(y_mid(leftX)), ...
             'rightX', rightX, 'rightY', round(y_mid(rightX)), 'bb', [leftX, 1, rightX - leftX, imgH]); %#ok<AGROW>
     end

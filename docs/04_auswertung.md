@@ -34,7 +34,6 @@ Alle Ausgaben liegen unter `cfg.pfade.ausgabe` (Standard `output/`):
 | `…/plots/…_Blasenlaenge.png/.pdf` | Verlaufsplot L_B(x) je Einstellung |
 | `Output_…/Analysis_<Mass/Pressure>_<Messlauf>_<Aufnahme>.csv` | Einzelauswertung eines Videos |
 | `lauf_config_<Zeitstempel>.json` | vollständige Einstellungen des Laufs (Kapitel 6.4) |
-| `abbildungen/Abb*.png` | Methodik-Abbildungen, nur bei `cfg.abbildungen.exportieren` |
 
 Eine bestehende Datei gleichen Namens wird überschrieben.
 

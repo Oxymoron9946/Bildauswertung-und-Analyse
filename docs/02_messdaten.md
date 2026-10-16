@@ -6,18 +6,11 @@ aussehen muss und wie eine neue Messreihe hinzukommt.
 
 ## 2.1 Ordnerstruktur
 
-```
-PTFE_1000_600/                                   Messordner (beliebiger Name)
-  Auswertung_20_CO2/                             beliebige Zwischenebenen
-    Pos_1_Kal_1/                                 Kalibriergruppe
-      Kalibrierung_1_Pos_1_08.04.2026/           Kalibrierordner
-        XSM-3520 Camera 0330_.avi                Kalibriervideo (Lineal)
-      0.198_0.111_Pos_1_R_1000_PTFE_600/         Messlauf
-        200fps_001/                              Aufnahme
-          XSM-3520 Camera 0330_.avi              Messvideo
-        200fps_002/                              zweite Aufnahme desselben Messlaufs
-          XSM-3520 Camera 0330_.avi
-```
+![Aufbau eines Messordners: Kalibriergruppe, Kalibrierordner, Messlauf und Aufnahmen](bilder/ordnerstruktur.png)
+
+Die Farben stehen für die Ebenen, die das Programm erkennt. Nur die
+Kalibriergruppe, der Kalibrierordner, der Messlauf und die Aufnahme haben
+feste Namensregeln; Messordner und Zwischenebenen sind frei benennbar.
 
 **Kalibriergruppe `Pos_<n>_Kal_<k>`.** Kameraposition n und Nummer k der
 Kalibrierung. Unterhalb eines Gruppenordners muss genau ein Kalibriervideo
@@ -27,18 +20,12 @@ Kalibriervideo. Fehlt es oder gibt es mehrere, bricht die Auswertung dieses
 Videos mit einer Meldung ab.
 
 **Messlauf.** Der Ordnername ist der Schlüssel ins Laborbuch und enthält
-die Einstellungen:
+die Einstellungen des Versuchs:
 
-```
-0.198 _ 0.111 _ Pos_1 _ R _ 1000 _ PTFE _ 600 [_Druck]
- j_G     j_L    Pos     Form Kanal Material Nadel
-[m/s]   [m/s]          (R rund,  [µm]        [µm]
-                        Q quadr.)
-```
+![Aufbau des Messlauf-Namens](bilder/dateiname.png)
 
-Der Zusatz `_Druck` kennzeichnet eine Druckkalibrierung; ohne ihn gilt die
-Messung als Stoffübergangsmessung (Massentransfer). Dezimaltrennzeichen ist
-der Punkt.
+Ohne den Zusatz `_Druck` gilt die Messung als Stoffübergangsmessung
+(Massentransfer).
 
 **Aufnahme `<n>fps_<nnn>`.** Bildrate n [1/s] und laufende Nummer. Mehrere
 Aufnahmen desselben Messlaufs werden getrennt ausgewertet und in der
@@ -71,9 +58,7 @@ Laborbuchs werden nicht gelesen.
 Für Druckkalibrierungen setzt `cfg.laborbuch.co2_anteil_druck` den
 CO₂-Anteil unabhängig vom Laborbuch (Standard 0, siehe Kapitel 3).
 
-> **Hinweis:** Steht ein `Dateiname` doppelt im Laborbuch, gilt die erste
-> Zeile. Das betrifft derzeit nur `0.15_0.06_Position_1` (Altdaten
-> Glaskanal, siehe Kapitel 8).
+Steht ein `Dateiname` doppelt im Laborbuch, gilt die erste Zeile.
 
 ## 2.3 Neue Messreihe hinzufügen
 

@@ -23,7 +23,6 @@ function cfg = config()
     cfg.pfade.messdaten  = wurzel;                                 % Ordner, unter dem die Messreihen liegen
     cfg.pfade.laborbuch  = fullfile(wurzel, 'data', 'Laborbuch.csv');
     cfg.pfade.ausgabe    = fullfile(wurzel, 'output');             % CSV-Ergebnisse
-    cfg.pfade.abbildungen = fullfile(wurzel, 'output', 'abbildungen'); % Methodik-Abbildungen (Abb1–9)
 
     %% Video
     cfg.video.dateimuster = 'XSM-3520 Camera 0330_*.avi';  % Dateiname der Kamera-AVIs
@@ -95,12 +94,6 @@ function cfg = config()
     cfg.einlauf.rho_kg_m3 = 1000;    % Dichte der kontinuierlichen Phase (Wasser)
     cfg.einlauf.mu_Pa_s   = 0.001;   % Viskosität der kontinuierlichen Phase (Wasser)
     cfg.einlauf.faktor    = 0.05;
-
-    %% Methodik-Abbildungen (Abb1–9 eines Frames)
-    cfg.abbildungen.exportieren = false;
-    cfg.abbildungen.frame       = 15;
-    cfg.abbildungen.dpi         = 600;
-    cfg.abbildungen.bemassung_px = 45;   % Höhe der Bemaßungslinie über der Blase [px]
 
     %% Plots
     cfg.plots.sprache  = 'de';           % 'de' oder 'en'

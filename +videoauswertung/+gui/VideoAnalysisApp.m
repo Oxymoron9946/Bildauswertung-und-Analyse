@@ -125,8 +125,7 @@ function fig = VideoAnalysisApp(cfg)
             if strcmp(bg.SelectedObject.Tag, 'single')
                 [~, rohdaten, bins] = videoauswertung.kern.auswerten_Einzel(lauf, ziel, sensStart.Value, rueck);
                 if ~isempty(rohdaten)
-                    videoauswertung.plots.plot_Laenge_Position(rohdaten, stil, achse);
-                    zeigeErgebnisse('einzel', rohdaten, bins, {});
+                    zeigeErgebnisse('einzel', rohdaten, bins, {});   % Live-Tab behält das letzte Bild
                 end
             else
                 sweep = sensStart.Value:cfg.gui.sens_schritt:sensEnde.Value;

@@ -1,4 +1,4 @@
-# 8 Grenzen und offene Punkte
+# 8 Grenzen
 
 ## 8.1 Gültigkeitsbereich
 
@@ -25,7 +25,7 @@ Die Auswertung setzt voraus:
 - **Bin-Breite variiert.** Ist die mittlere Blasenlänge größer als
   `cfg.physik.bin_mm`, wird die Bin-Breite auf ceil(2 · L_B)/2 mm
   vergrößert. Ergebnisse verschiedener Messreihen haben dann
-  unterschiedliche Bin-Raster (Befund F05, bewusst beibehalten).
+  unterschiedliche Bin-Raster.
 - **`VoidFraction` ist ein Längenverhältnis** L_B/L_UC, kein
   Volumenanteil; Form der Blasenkappen und Flüssigkeitsfilm sind nicht
   berücksichtigt.
@@ -36,9 +36,11 @@ Die Auswertung setzt voraus:
 - **Stabile Messzone.** Bins am Bildrand mit wenigen Messpunkten werden
   verworfen; bei kurzen Videos oder wenigen Blasen kann die Zone leer sein
   (Warnung „Keine stabile Messzone gefunden“, keine Zeilen für dieses Video).
-- **Reflexionen.** Starke Lichtreflexe können Blasen zerteilen. Die
-  Fragmentverbindung (`cfg.detektion.fragmente_verbinden`) gleicht das bei
-  regelmäßigem Slug-Abstand aus, nicht aber bei sehr unregelmäßigem Flow.
+- **Reflexionen.** Starke Lichtreflexe können eine Blase in zwei Teile
+  zerlegen, die dann als zwei kurze Blasen gezählt werden. Die
+  experimentelle Option `cfg.detektion.fragmente_verbinden` (Standard aus)
+  verbindet solche Teile, verbindet in manchen Videos aber auch echte
+  Blasen; vor Gebrauch mit der Live-Ansicht prüfen.
 
 ## 8.3 Nicht auswertbare Daten
 
@@ -47,22 +49,5 @@ Die Auswertung setzt voraus:
   120 oder 500 fps. Der Batch überspringt diese Videos. Für eine
   Auswertung müssten die Ordner nach Kapitel 2 umbenannt und einer
   Kalibrierung zugeordnet werden.
-- Doppelter Laborbuch-Schlüssel `0.15_0.06_Position_1` (gehört zu diesen
-  Altdaten, Befund F09).
-
-## 8.4 Offene Punkte
-
-- **Fragmentverbindung (F07).** Reflexionen zerteilen manche Blasen. Die
-  Option `cfg.detektion.fragmente_verbinden` hilft in einigen Videos
-  deutlich, verbindet in anderen aber echte Blasen und ist deshalb
-  standardmäßig aus. Ein besseres Kriterium wäre z. B., nur zu verbinden,
-  wenn die Gesamtlänge zur typischen Blasenlänge des Frames passt.
-- **Geschwindigkeitsgrenze des Trackings.** `cfg.tracking.max_sprung_px`
-  (50 px) begrenzt die messbare Geschwindigkeit bei 200 fps auf etwa
-  0,55 m/s. Für schnellere Strömungen erhöhen und mit dem Regressionssatz
-  prüfen.
-- **Altdaten Glaskanal/Messungen** (8.3) sind nicht ausgewertet.
-- **Laborbuch als Excel-Datei.** Neben `data/Laborbuch.csv` liegt
-  `data/Laborbuch.xlsx`; gelesen wird nur die CSV. Wird die Excel-Datei
-  gepflegt, muss die CSV nach jeder Änderung neu exportiert werden
-  (Semikolon, Dezimalpunkt).
+- Zu diesen Altdaten gehört auch der doppelte Laborbuch-Eintrag
+  `0.15_0.06_Position_1`.

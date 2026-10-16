@@ -17,15 +17,18 @@ DOCS = pathlib.Path(__file__).resolve().parent
 PROJEKT = DOCS.parent
 ZIEL = DOCS / 'Handbuch_Videoauswertung.pdf'
 KAPITEL = ['01_installation', '02_messdaten', '03_konfiguration', '04_auswertung', '05_plots',
-           '06_gui', '07_methodik', '08_grenzen', '09_erweitern', 'CHANGELOG']
+           '06_gui', '07_methodik', '08_grenzen', '09_erweitern']
 
 KOPF = r"""
 \usepackage{fvextra}
 \DefineVerbatimEnvironment{Highlighting}{Verbatim}{breaklines,breakanywhere,commandchars=\\\{\}}
 \fvset{breaklines,breakanywhere}
 \usepackage{etoolbox}
-\AtBeginEnvironment{longtable}{\small}
+\usepackage{array}
+\setlength{\extrarowheight}{2pt}
+\AtBeginEnvironment{longtable}{\small\renewcommand{\arraystretch}{1.35}}
 \setlength{\emergencystretch}{3em}
+\counterwithout{figure}{chapter}
 \let\originalunderscore\_
 \renewcommand{\_}{\originalunderscore\allowbreak}
 """
@@ -60,7 +63,12 @@ def spaltenbreiten(text):
                 j += 1
             zellen = [[z.strip() for z in zeile.strip().strip('|').split('|')] for k, zeile in enumerate(zeilen[i:j]) if k != 1]
             n = len(zellen[0])
-            breite = [max(3, min(60, max(len(z[s]) if s < len(z) else 0 for z in zellen))) for s in range(n)]
+            def wort(z):   # längstes nicht trennbares Stück (Code bricht nur an _ um)
+                return max((len(w) for w in re.split(r'[\s_]+', z.replace('`', ''))), default=0)
+            breite = []
+            for s in range(n):
+                spalte = [z[s] if s < len(z) else '' for z in zellen]
+                breite.append(max(8, max(wort(z) for z in spalte) + 3, min(30, max(len(z) for z in spalte))))
             zeilen[i + 1] = '|' + '|'.join('-' * b for b in breite) + '|'
             i = j
         else:

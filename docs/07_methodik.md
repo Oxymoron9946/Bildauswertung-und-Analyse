@@ -65,9 +65,6 @@ Funktion: `videoauswertung.kern.erkenne_Blasen`
    Slug-Länge des Frames, gilt als Reflexion; die beiden Blasenteile
    werden verbunden. Siehe Kapitel 8 zur Wirkung.
 
-Die Abbildungen Abb1 bis Abb9 (`abbildungen.exportieren = true`) zeigen
-diese Schritte für ein Frame.
-
 ## 7.3 Zuordnung über die Frames
 
 Funktion: `videoauswertung.kern.verfolge_Blasen`

@@ -1,71 +1,127 @@
 # 1 Installation
 
-## 1.1 Voraussetzungen
+## 1.1 MATLAB und Toolboxen installieren
 
-| Software | Version | Wofür |
-|---|---|---|
-| MATLAB | R2025a oder neuer (entwickelt mit R2025b) | alles |
-| Image Processing Toolbox | passend zu MATLAB | Bildverarbeitung (adaptthresh, regionprops, imreconstruct …) |
-| Signal Processing Toolbox | passend zu MATLAB | Strichsuche auf dem Lineal (findpeaks) |
-| Statistics and Machine Learning Toolbox | passend zu MATLAB | Mittelwerte je Bin (grpstats) |
-| Parallel Computing Toolbox | passend zu MATLAB | Batch parallel über mehrere Kerne; ohne sie läuft der Batch nacheinander |
+Benötigt wird **MATLAB R2025a oder neuer** mit vier Toolboxen:
 
-Die Liste stammt aus `matlab.codetools.requiredFilesAndProducts` über
-alle Dateien des Pakets. Installierte Toolboxen zeigt `ver` an.
-
-R2025a ist nötig, weil die Plots mit `theme(fig, 'light')` unabhängig vom
-Desktop-Design hell gezeichnet werden.
-
-Nur für das PDF-Handbuch (optional):
-
-| Software | Wofür |
+| Toolbox | Wofür |
 |---|---|
-| Python 3.10 oder neuer | `docs/build_pdf.py` |
-| `pypandoc_binary` (pip) | Markdown → LaTeX, bringt Pandoc mit |
-| TeX-Distribution mit XeLaTeX (TeX Live oder MiKTeX) | PDF-Satz |
+| Image Processing Toolbox | Bildverarbeitung der Videos |
+| Signal Processing Toolbox | Strichsuche auf dem Lineal |
+| Statistics and Machine Learning Toolbox | Mittelwerte und Streuung je Bin |
+| Parallel Computing Toolbox | Batch parallel auf allen Prozessorkernen (ohne sie läuft der Batch nacheinander, nur langsamer) |
 
-## 1.2 Einrichten
+**MATLAB neu installieren**
 
-1. Repository klonen oder als ZIP entpacken, z. B. nach
-   `C:\Messungen\Videoauswertung`.
-2. Messordner (`PTFE_1000_600`, …) in diesen Ordner kopieren oder in
-   `config.m` unter `cfg.pfade.messdaten` den Ordner eintragen, in dem sie
-   liegen.
-3. MATLAB starten, in den Projektordner wechseln und prüfen:
+1. Auf <https://www.mathworks.com/downloads> mit dem MathWorks-Konto
+   anmelden. Das Konto mit der Hochschul-E-Mail-Adresse anlegen; darüber
+   wird die Campus-Lizenz der Hochschule zugeordnet.
+2. Den Installer für Windows herunterladen und starten, mit demselben Konto
+   anmelden und die Lizenz auswählen.
+3. Im Schritt **Produkte auswählen** neben *MATLAB* die vier Toolboxen aus
+   der Tabelle anhaken. Alle anderen Produkte werden nicht gebraucht.
+4. Installation abschließen und MATLAB starten.
+
+**Toolboxen zu einer vorhandenen MATLAB-Installation hinzufügen**
+
+1. In MATLAB auf der Registerkarte **Home** → **Add-Ons** → **Get Add-Ons**
+   (bzw. *Add-Ons holen*) öffnen.
+2. Nach dem Namen der Toolbox suchen, z. B. „Image Processing Toolbox“, und
+   **Install** wählen. Für jede fehlende Toolbox wiederholen.
+
+**Prüfen**
+
+```matlab
+ver
+```
+
+listet die installierte MATLAB-Version und alle Toolboxen. Die vier
+Toolboxen aus der Tabelle müssen darin vorkommen.
+
+## 1.2 Programm herunterladen
+
+Das Programm liegt auf GitHub:
+<https://github.com/Oxymoron9946/Bildauswertung-und-Analyse>
+(Branch `master`).
+
+**Variante A: als ZIP, ohne weitere Software**
+
+1. Die Seite öffnen, oben rechts auf **Code** → **Download ZIP** klicken.
+2. Das ZIP entpacken, z. B. nach `C:\Messungen\Videoauswertung`. Dieser
+   Ordner ist im Folgenden der **Projektordner**; er enthält u. a.
+   `config.m`, `run_Batch.m` und `Start_App.m`.
+
+Für eine neuere Version das ZIP erneut herunterladen und den Ordner
+ersetzen. Eigene Änderungen an `config.m` und `data/Laborbuch.csv` vorher
+sichern.
+
+**Variante B: mit Git (bequem für spätere Aktualisierungen)**
+
+1. *Git for Windows* von <https://git-scm.com/download/win> installieren
+   (Standardeinstellungen genügen).
+2. Die Eingabeaufforderung öffnen, in den gewünschten Elternordner wechseln
+   und das Repository holen:
+
+   ```bat
+   cd C:\Messungen
+   git clone https://github.com/Oxymoron9946/Bildauswertung-und-Analyse.git Videoauswertung
+   ```
+
+3. Später eine neue Version holen (im Projektordner):
+
+   ```bat
+   cd C:\Messungen\Videoauswertung
+   git pull
+   ```
+
+   Hat man `config.m` oder das Laborbuch lokal geändert, meldet `git pull`
+   einen Konflikt nur dann, wenn dieselbe Datei auch auf GitHub geändert
+   wurde.
+
+## 1.3 Messdaten bereitstellen
+
+Die Messvideos (mehrere GB) sind nicht im Repository; sie liegen am
+Lehrstuhl. Zwei Möglichkeiten:
+
+- **In den Projektordner kopieren:** die Messordner (z. B.
+  `PTFE_1000_600`) direkt in den Projektordner legen. Mehr ist nicht zu tun.
+- **Am Ort lassen:** in `config.m` den Ordner eintragen, in dem die
+  Messordner liegen, z. B.
+
+  ```matlab
+  cfg.pfade.messdaten = 'D:\Messdaten\Taylor-Flow';
+  ```
+
+Aufbau der Messordner und Laborbuch: Kapitel 2.
+
+## 1.4 Erster Start
+
+1. MATLAB starten und in den Projektordner wechseln (Ordnerleiste oben oder
+   `cd C:\Messungen\Videoauswertung`).
+2. Einstellungen prüfen:
 
    ```matlab
    cfg = config();
    videoauswertung.kern.pruefe_Config(cfg)   % keine Ausgabe = in Ordnung
    ```
 
-4. Tests ausführen (mit Videos ca. 15 min, ohne Videos unter 1 min):
+3. Einen kleinen Messordner auswerten: in `run_Batch.m` den Messordner
+   eintragen (Voreinstellung `PVC_1500_1150`, 15 Videos, wenige Minuten) und
+   `run_Batch` ausführen. Die Ergebnisse stehen danach in `output/`
+   (Kapitel 4).
+4. Alternativ die Oberfläche starten: `Start_App` (Kapitel 6).
 
-   ```matlab
-   run('tests/run_AllTests.m')
-   ```
+Die drei Einstiege `run_Batch`, `run_Einzel` und `Start_App` finden alle
+Programmteile selbst; ein `addpath` ist nicht nötig.
 
-Es ist kein `addpath` nötig: Die Einstiege `run_Batch.m`, `run_Einzel.m`
-und `Start_App.m` fügen den Projektordner selbst hinzu.
-
-## 1.3 PDF-Handbuch bauen (optional)
-
-```bat
-python -m venv .venv-docs
-.venv-docs\Scripts\pip install -r docs\requirements.txt
-.venv-docs\Scripts\python docs\build_pdf.py
-```
-
-Ergebnis: `docs/Handbuch_Videoauswertung.pdf`.
-
-## 1.4 Typische Fehler
+## 1.5 Typische Fehler
 
 | Meldung | Ursache | Abhilfe |
 |---|---|---|
-| `Unrecognized function or variable 'config'` | MATLAB steht nicht im Projektordner und der Einstieg wurde nicht benutzt | in den Projektordner wechseln oder `run_Batch`/`Start_App` starten |
+| `Unrecognized function or variable 'config'` | MATLAB steht nicht im Projektordner | in den Projektordner wechseln oder `run_Batch`/`Start_App` starten |
 | `Unable to resolve the name 'videoauswertung.kern…'` | wie oben | wie oben |
 | `Laborbuch nicht gefunden unter: …` | `cfg.pfade.laborbuch` falsch | Pfad in `config.m` prüfen |
 | `Messordner nicht gefunden: …` | Name in `run_Batch.m` falsch | relativ zu `cfg.pfade.messdaten` oder absolut angeben |
 | `Keine passenden .avi Dateien unter …` | falscher Ordner oder andere Kamera | Ordner prüfen; `cfg.video.dateimuster` |
 | `Undefined function 'adaptthresh'` / `'findpeaks'` / `'grpstats'` | Toolbox fehlt | Toolbox installieren (1.1) |
 | Batch sehr langsam, kein „Starting parallel pool“ | Parallel Computing Toolbox fehlt | installieren oder in Kauf nehmen |
-| Plots erscheinen dunkel | MATLAB älter als R2025a | MATLAB aktualisieren |

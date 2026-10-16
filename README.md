@@ -17,16 +17,19 @@ dieselbe Einstellungsdatei `config.m`.
 1. **MATLAB R2025a oder neuer** mit Image Processing, Signal Processing,
    Statistics and Machine Learning und Parallel Computing Toolbox
    installieren (Details: [docs/01_installation.md](docs/01_installation.md)).
-2. **Messdaten** in den Projektordner legen, z. B. `PTFE_1000_600/…`, und im
+2. **Programm herunterladen:** auf dieser Seite **Code → Download ZIP** und
+   entpacken, oder
+   `git clone https://github.com/Oxymoron9946/Bildauswertung-und-Analyse.git`.
+3. **Messdaten** in den Projektordner legen, z. B. `PTFE_1000_600/…`, und im
    Laborbuch `data/Laborbuch.csv` je Messlauf eine Zeile pflegen
    ([docs/02_messdaten.md](docs/02_messdaten.md)).
-3. **Einstellungen** prüfen: `config.m`. Für den ersten Lauf ist nichts zu
+4. **Einstellungen** prüfen: `config.m`. Für den ersten Lauf ist nichts zu
    ändern ([docs/03_konfiguration.md](docs/03_konfiguration.md)).
-4. **Auswerten** – in MATLAB im Projektordner:
+5. **Auswerten** – in MATLAB im Projektordner:
    - alle Videos eines Messordners: in `run_Batch.m` den Ordner eintragen, dann `run_Batch`
    - ein einzelnes Video mit Live-Ansicht: `run_Einzel`
    - mit Oberfläche: `Start_App`
-5. **Ergebnisse** stehen in `output/`: CSV je Setup in
+6. **Ergebnisse** stehen in `output/`: CSV je Setup in
    `Output_MassTransfer/` bzw. `Output_PressureCalibration/`, Plots im
    Unterordner `plots/` ([docs/04_auswertung.md](docs/04_auswertung.md)).
 
@@ -46,8 +49,8 @@ Start_App.m            Bedienoberfläche
   +gui/                Oberfläche (ruft nur +kern und +plots auf)
 data/                  Laborbuch (CSV, Semikolon)
 tests/                 Einheitentests, GUI-Rauchtest, Regressionstest
-docs/                  Handbuch (Markdown und PDF), CHANGELOG
-tools/                 Vergleichs- und Baseline-Werkzeuge
+docs/                  Handbuch (Markdown und PDF: docs/Handbuch_Videoauswertung.pdf)
+tools/                 Hilfswerkzeuge (Ergebnisvergleich, Handbuch-Abbildungen)
 ```
 
 Die Messvideos selbst (`Glaskanal/`, `PTFE_1000_600/`, …, mehrere GB) sind
@@ -64,8 +67,7 @@ nicht im Repository.
 | [05 Plots](docs/05_plots.md) | jeder Plot mit Beispiel und Aufruf |
 | [06 GUI](docs/06_gui.md) | Bedienung, Zuordnung zu `config.m`, Lauf wiederholen |
 | [07 Methodik](docs/07_methodik.md) | Auswertekette mit Formeln |
-| [08 Grenzen](docs/08_grenzen.md) | Gültigkeit, Einschränkungen, offene Punkte |
+| [08 Grenzen](docs/08_grenzen.md) | Gültigkeit, Einschränkungen, nicht auswertbare Daten |
 | [09 Erweitern](docs/09_erweitern.md) | Architektur, neuer Plot, Tests |
-| [CHANGELOG](docs/CHANGELOG.md) | Änderungen gegenüber dem Ausgangsstand |
 
 Das PDF-Handbuch entsteht mit `python docs/build_pdf.py`.

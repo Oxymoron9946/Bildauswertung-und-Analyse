@@ -83,6 +83,9 @@ run('tests/run_AllTests.m')
 
 `test_GuiLauf` und `test_Regression` brauchen die Messvideos; ohne sie
 werden sie übersprungen.
-Ändert eine gewollte Korrektur Zahlen, wird die Referenz erneuert und die
-Änderung mit Vorher/Nachher-Beleg im CHANGELOG festgehalten
-(`tools/vergleiche_Ergebnisse.m`).
+
+Ändert eine gewollte Erweiterung die Ergebnisse, schlägt
+`test_Regression` fehl. Dann die Abweichungen ansehen
+(`tools/vergleiche_Ergebnisse.m` vergleicht zwei Ergebnisordner) und, wenn
+sie stimmen, die Dateien in `tests/referenz/` durch die neuen Ergebnisse
+ersetzen.
