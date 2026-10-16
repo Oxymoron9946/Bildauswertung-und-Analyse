@@ -1,4 +1,4 @@
-function zeige_Live(ax, I, seeds, det, px2mm, frame)
+function zeige_Live(ax, I, seeds, det, px2mm, frame, sprache)
 % ZEIGE_LIVE Zeichnet ein Frame mit Kanalrändern, Blasengrenzen und Blasenlänge.
 %
 % Rot: Kanalwände; grün/rot: linke/rechte Blasengrenze; magenta: Länge [mm].
@@ -10,7 +10,10 @@ function zeige_Live(ax, I, seeds, det, px2mm, frame)
 % seeds, det : aus erkenne_Blasen
 % px2mm : Maßstab [mm/px]
 % frame : Framenummer (Titel)
+% sprache : optional, 'de' (Standard) oder 'en' für den Titel
 
+    if nargin < 7, sprache = 'de'; end
+    t = videoauswertung.plots.PlotStil.texte();
     [imgH, imgW] = size(I);
     cla(ax);
     imagesc(ax, I);
@@ -19,7 +22,7 @@ function zeige_Live(ax, I, seeds, det, px2mm, frame)
     ylim(ax, [-90, imgH]);
     axis(ax, 'image');
     hold(ax, 'on');
-    text(ax, imgW/2, -75, sprintf('Frame %d – Kanal- und Blasenerkennung', frame), ...
+    text(ax, imgW/2, -75, sprintf(t.live_titel.(sprache), frame), ...
         'Color', 'k', 'FontWeight', 'bold', 'FontSize', 12, 'HorizontalAlignment', 'center');
 
     if isfield(seeds, 'y_top_line') && ~isempty(seeds.y_top_line)

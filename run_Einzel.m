@@ -10,7 +10,7 @@ video = fullfile(cfg.pfade.messdaten, 'PTFE_1000_600', 'Auswertung_20_CO2', 'Pos
     '0.198_0.111_Pos_1_R_1000_PTFE_600', '200fps_001', 'XSM-3520 Camera 0330_.avi');
 
 live = figure('Name', 'Live-Ansicht', 'Position', [100 200 1000 300]);
-rueck.live = @(I, seeds, det, px2mm, frame) videoauswertung.plots.zeige_Live(gca(live), I, seeds, det, px2mm, frame);
+rueck.live = @(I, seeds, det, px2mm, frame) videoauswertung.plots.zeige_Live(gca(live), I, seeds, det, px2mm, frame, cfg.plots.sprache);
 [datei, rohdaten, bins] = videoauswertung.kern.auswerten_Einzel(cfg, video, [], rueck);
 
 % Ergebnisplots (Sprache, Größe, Formate: cfg.plots)

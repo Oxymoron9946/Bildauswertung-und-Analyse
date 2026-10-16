@@ -49,7 +49,7 @@ Start_App.m            Bedienoberfläche
   +gui/                Oberfläche (ruft nur +kern und +plots auf)
 data/                  Laborbuch (CSV, Semikolon)
 tests/                 Einheitentests, GUI-Rauchtest, Regressionstest
-docs/                  Handbuch (Markdown und PDF: docs/Handbuch_Videoauswertung.pdf)
+docs/                  Handbuch (Markdown und PDF), englische Fassung in docs/en/
 tools/                 Hilfswerkzeuge (Ergebnisvergleich, Handbuch-Abbildungen)
 ```
 
@@ -70,4 +70,8 @@ nicht im Repository.
 | [08 Grenzen](docs/08_grenzen.md) | Gültigkeit, Einschränkungen, nicht auswertbare Daten |
 | [09 Erweitern](docs/09_erweitern.md) | Architektur, neuer Plot, Tests |
 
-Das PDF-Handbuch entsteht mit `python docs/build_pdf.py`.
+PDF: [docs/Handbuch_Videoauswertung.pdf](docs/Handbuch_Videoauswertung.pdf),
+erzeugt mit `python docs/build_pdf.py`.
+
+**English manual:** [docs/Handbuch_Videoauswertung_en.pdf](docs/Handbuch_Videoauswertung_en.pdf)
+(chapters in [docs/en/](docs/en/), built with `python docs/build_pdf.py en`).

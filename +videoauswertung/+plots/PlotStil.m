@@ -95,6 +95,10 @@ classdef PlotStil
             t.titel_verlauf_LB = struct('de', 'Blasenlängenverlauf', 'en', 'Bubble length profile');
             t.gas          = struct('de', 'Gas', 'en', 'gas');
             t.fluessig     = struct('de', 'Flüssigkeit', 'en', 'liquid');
+            t.live_titel   = struct('de', 'Frame %d – Kanal- und Blasenerkennung', 'en', 'Frame %d – channel and bubble detection');
+            t.kalib_titel  = struct('de', 'Maßstab: %.5f mm/px | Messstrecke: %.2f mm | Bildlänge: %.2f mm', ...
+                                    'en', 'Scale: %.5f mm/px | measured span: %.2f mm | image length: %.2f mm');
+            t.kalib_fehl   = struct('de', 'KALIBRIERUNG FEHLGESCHLAGEN', 'en', 'CALIBRATION FAILED');
         end
     end
 end

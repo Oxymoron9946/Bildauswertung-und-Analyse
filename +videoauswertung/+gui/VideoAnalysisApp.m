@@ -110,7 +110,7 @@ function fig = VideoAnalysisApp(cfg)
         lauf.anzeige.jedes_n_frame = nFeld.Value;
 
         rueck.abbruch = @() fig.UserData.CancelRequested;
-        rueck.live = @(I, seeds, det, px2mm, frame) videoauswertung.plots.zeige_Live(achse, I, seeds, det, px2mm, frame);
+        rueck.live = @(I, seeds, det, px2mm, frame) videoauswertung.plots.zeige_Live(achse, I, seeds, det, px2mm, frame, lauf.plots.sprache);
         if lauf.anzeige.kalibrierung
             rueck.kalibrierung = @(frame, info, px2mm, ok) zeigeKalibrierung(frame, info, px2mm, ok);
         end
@@ -146,7 +146,7 @@ function fig = VideoAnalysisApp(cfg)
     end
 
     function zeigeKalibrierung(frame, info, px2mm, ok)
-        videoauswertung.plots.zeige_Kalibrierung(kalibAchse, frame, info, px2mm, ok);
+        videoauswertung.plots.zeige_Kalibrierung(kalibAchse, frame, info, px2mm, ok, cfg.plots.sprache);
     end
 
     function zeigeErgebnisse(art, rohdaten, bins, dateien)

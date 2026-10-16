@@ -61,7 +61,8 @@ Regeln:
 1. In `berechne_Physik` je Messpunkt berechnen und als Spalte in
    `rohdaten` aufnehmen.
 2. In der `grpstats`-Zeile unter `DataVars` ergänzen; dann erscheinen
-   `mean_`, `std_` und `numel_` in der Ergebnistabelle.
+   `mean_` und `std_` in der Ergebnistabelle (die Anzahl steht für alle
+   Größen gemeinsam in `GroupCount`).
 3. Spaltenlexikon in Kapitel 4 ergänzen.
 4. Regressionstest laufen lassen: bestehende Spalten müssen unverändert
    bleiben; neue Spalten stören den Vergleich nicht.
