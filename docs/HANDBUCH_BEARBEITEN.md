@@ -1,5 +1,7 @@
 # Handbuch bearbeiten
 
+English version: [en/EDITING_THE_MANUAL.md](en/EDITING_THE_MANUAL.md)
+
 Das Handbuch besteht aus Textdateien (`docs/*.md`, Format *Markdown*). Das PDF
 `docs/Handbuch_Videoauswertung.pdf` wird daraus **automatisch erzeugt**. Nur die
 `.md`-Dateien bearbeiten, nie das PDF.
@@ -37,9 +39,9 @@ files** → Bild hochladen. Im Text einbinden mit
 | `08_grenzen.md` | 8 Grenzen |
 | `09_erweitern.md` | 9 Erweitern |
 
-Die englische Fassung steht in `docs/en/` mit denselben Dateinamen. Sie wird
-**nicht** automatisch übersetzt: Eine Änderung im deutschen Kapitel bei Bedarf
-dort ebenfalls eintragen.
+Die englische Fassung steht in `docs/en/` mit denselben Dateinamen. Keine der beiden
+Fassungen wird automatisch übersetzt: Eine Änderung bei Bedarf in der anderen
+Sprache ebenfalls eintragen.
 
 ## Markdown in Kürze
 
@@ -63,7 +65,8 @@ wird ignoriert.
   Datei korrigieren und erneut speichern. Das alte PDF bleibt so lange
   erhalten.
 - **PDF von Hand neu bauen:** Actions → *Handbuch-PDF bauen* → **Run workflow**.
-- **Neues Kapitel:** neue Datei `docs/NN_name.md` anlegen *und* ihren Namen in
+- **Neues Kapitel:** neue Datei `docs/NN_name.md` (und `docs/en/NN_name.md`) anlegen
+  *und* ihren Namen in
   `docs/build_pdf.py` in die Liste `KAPITEL = [...]` eintragen, sonst fehlt
   sie im PDF.
 
