@@ -71,7 +71,9 @@ nicht im Repository.
 | [09 Erweitern](docs/09_erweitern.md) | Architektur, neuer Plot, Tests |
 
 PDF: [docs/Handbuch_Videoauswertung.pdf](docs/Handbuch_Videoauswertung.pdf),
-erzeugt mit `python docs/build_pdf.py`.
+erzeugt mit `python docs/build_pdf.py`, bei jeder Änderung in `docs/`
+automatisch neu gebaut. Handbuch ändern:
+[docs/HANDBUCH_BEARBEITEN.md](docs/HANDBUCH_BEARBEITEN.md).
 
 **English manual:** [docs/Handbuch_Videoauswertung_en.pdf](docs/Handbuch_Videoauswertung_en.pdf)
 (chapters in [docs/en/](docs/en/), built with `python docs/build_pdf.py en`).
